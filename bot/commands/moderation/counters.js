@@ -70,8 +70,8 @@ module.exports = {
       }
 
       await interaction.deferReply({ ephemeral: true });
-      await counterService.updateCounters(guild, guildDoc);
-      return interaction.followUp('✅ Counter channel names refreshed!');
+      await counterService.updateCounters(guild, guildDoc, true);
+      return interaction.followUp('✅ Counter channel names refreshed with latest member counts!');
     }
 
     if (sub === 'remove') {
@@ -104,6 +104,16 @@ module.exports = {
 
     const action = args[0]?.toLowerCase();
     const guild = message.guild;
+
+    if (action === 'update' || action === 'refresh') {
+      const guildDoc = await Guild.findOne({ guildId: guild.id });
+      if (!guildDoc?.voiceCounters?.enabled) {
+        return message.reply('⚠️ Voice counters are not configured. Run `+counter setup` first.');
+      }
+      const reply = await message.reply('⏳ Fetching latest member counts and updating counter channels...');
+      await counterService.updateCounters(guild, guildDoc, true);
+      return reply.edit('✅ Counter channel names refreshed with latest member counts!');
+    }
 
     if (action === 'remove') {
       const guildDoc = await Guild.findOne({ guildId: guild.id });

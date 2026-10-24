@@ -61,7 +61,11 @@ const statsService = {
         }
       });
 
-      const totalMembers = guild.memberCount || 0;
+      if (guild.members.cache.size < (guild.memberCount || 0)) {
+        await guild.members.fetch().catch(() => {});
+      }
+
+      const totalMembers = guild.memberCount || guild.members.cache.size || 0;
       const botCount = guild.members.cache.filter(m => m.user.bot).size;
       const humanCount = Math.max(0, totalMembers - botCount);
 

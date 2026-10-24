@@ -30,7 +30,13 @@ module.exports = {
       bumpService.init(client);
       await stickyService.loadCache();
       await inviteService.init(client);
-      logger.info('Background schedulers & caches initialized (Birthdays, Bump Reminders, Sticky Messages, Invites).');
+
+      // Pre-fetch all members for all guilds so bot & human counters are accurate
+      for (const guild of client.guilds.cache.values()) {
+        await guild.members.fetch().catch(() => {});
+      }
+
+      logger.info('Background schedulers & caches initialized (Birthdays, Bump Reminders, Sticky Messages, Invites, Guild Members).');
     } catch (err) {
       logger.error('Error starting background schedulers:', err.message);
     }

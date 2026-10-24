@@ -20,7 +20,11 @@ router.get('/:guildId/overview', async (req, res) => {
   const guild = client.guilds.cache.get(guildId);
   const settings = await guildService.getSettings(guildId);
 
-  const totalMembers = guild ? guild.memberCount : 0;
+  if (guild) {
+    await guild.members.fetch().catch(() => {});
+  }
+
+  const totalMembers = guild ? (guild.memberCount || guild.members.cache.size) : 0;
   const botMembers = guild ? guild.members.cache.filter(m => m.user.bot).size : 0;
   const humanMembers = Math.max(0, totalMembers - botMembers);
 

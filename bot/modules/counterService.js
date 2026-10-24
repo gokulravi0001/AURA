@@ -25,10 +25,13 @@ const counterService = {
   /**
    * Perform channel name updates
    */
-  async updateCounters(guild, settings) {
+  async updateCounters(guild, settings, force = false) {
     if (!guild || !settings.voiceCounters?.counters) return;
 
-    const total = guild.memberCount || 0;
+    // Fetch all guild members so bots and humans are accurately counted
+    await guild.members.fetch().catch(() => {});
+
+    const total = guild.memberCount || guild.members.cache.size || 0;
     const bots = guild.members.cache.filter(m => m.user.bot).size;
     const humans = Math.max(0, total - bots);
 
@@ -40,15 +43,15 @@ const counterService = {
     });
 
     const now = Date.now();
-    const TEN_MINUTES = 10 * 60 * 1000;
+    const minInterval = force ? 3000 : (10 * 60 * 1000); // 3 seconds on force, 10 min on routine
 
     for (const counter of settings.voiceCounters.counters) {
       const channel = guild.channels.cache.get(counter.channelId);
       if (!channel) continue;
 
       const lastUpdate = channelUpdateTimestamps.get(counter.channelId) || 0;
-      if (now - lastUpdate < TEN_MINUTES) {
-        continue; // Respect Discord API rate limit for channel renaming
+      if (!force && (now - lastUpdate < minInterval)) {
+        continue; // Respect Discord API rate limit for routine checks
       }
 
       let count = 0;
@@ -97,6 +100,9 @@ const counterService = {
       throw new Error('Bot is missing the Manage Channels permission.');
     }
 
+    // Fetch all guild members so bot and human numbers are accurate
+    await guild.members.fetch().catch(() => {});
+
     // 1. Create Statistics Category
     const category = await guild.channels.create({
       name: '📊 SERVER STATS',
@@ -110,7 +116,7 @@ const counterService = {
       ]
     });
 
-    const total = guild.memberCount || 0;
+    const total = guild.memberCount || guild.members.cache.size || 0;
     const bots = guild.members.cache.filter(m => m.user.bot).size;
     const humans = Math.max(0, total - bots);
 

@@ -21,7 +21,8 @@ module.exports = {
 };
 
 async function buildStatsEmbed(guild, client) {
-  const totalMembers = guild.memberCount || 0;
+  await guild.members.fetch().catch(() => {});
+  const totalMembers = guild.memberCount || guild.members.cache.size || 0;
   const botMembers = guild.members.cache.filter(m => m.user.bot).size;
   const humanMembers = Math.max(0, totalMembers - botMembers);
 
