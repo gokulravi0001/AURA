@@ -120,15 +120,37 @@ module.exports = {
     }
 
     // 3.5. AUTOMATIC BIRTHDAY CHANNEL DETECTION (Delete message & DM user)
-    const isBdaySetChannel = settings?.birthdays?.setChannelId && settings.birthdays.setChannelId === message.channel.id;
+    const chName = message.channel.name?.toLowerCase() || '';
+    const isNamedSetChannel = (
+      chName === 'bday-set' ||
+      chName === 'birthday-set' ||
+      chName === 'set-bday' ||
+      chName === 'set-birthday' ||
+      chName === 'birthdays' ||
+      chName === 'birthday' ||
+      chName === 'bday'
+    );
+    const isExplicitBdaySetChannel = settings?.birthdays?.setChannelId && settings.birthdays.setChannelId === message.channel.id;
     const isBdayLegacyChannel = !settings?.birthdays?.setChannelId && settings?.birthdays?.channelId === message.channel.id;
+    const isBdaySetChannel = isExplicitBdaySetChannel || (isNamedSetChannel && !settings?.birthdays?.setChannelId);
 
     if (settings?.modules?.birthdays !== false && (isBdaySetChannel || isBdayLegacyChannel)) {
+      // Auto-bind setChannelId if discovered by channel name
+      if (isNamedSetChannel && !settings?.birthdays?.setChannelId) {
+        const Guild = require('../../../models/Guild');
+        await Guild.updateOne(
+          { guildId: message.guild.id },
+          { $set: { 'birthdays.setChannelId': message.channel.id, 'modules.birthdays': true, 'birthdays.enabled': true } },
+          { upsert: true }
+        ).catch(() => {});
+        if (settings?.birthdays) settings.birthdays.setChannelId = message.channel.id;
+      }
+
       const birthdayService = require('../../modules/birthdayService');
       const Birthday = require('../../../models/Birthday');
       const parsed = birthdayService.parseDate(message.content);
 
-      // Always delete message from birthday set channel to maintain privacy & clean channel
+      // Always delete message from birthday set channel immediately to protect user privacy
       await message.delete().catch(() => {});
 
       if (parsed) {
@@ -147,15 +169,22 @@ module.exports = {
         const dmEmbed = new EmbedBuilder()
           .setColor(COLORS.SUCCESS)
           .setTitle('🎂 Birthday Successfully Saved!')
-          .setDescription(`Hello **${message.author.username}**, your birthday has been saved for **${message.guild.name}**!\n\n📅 **Date:** \`${formatted}\`\n\n🔒 *We automatically deleted your message in the channel to keep your date private.*\n🎉 *When your special day arrives, we will celebrate in ${wishChannelNotice}!*`)
+          .setDescription(
+            `Hello **${message.author.username}**, your birthday has been saved for **${message.guild.name}**!\n\n` +
+            `📅 **Date:** \`${formatted}\`\n\n` +
+            `🔒 **Privacy:** *We automatically deleted your message in <#${message.channel.id}> so your birthdate stays completely private.*\n\n` +
+            `🎉 *When your special day arrives, we will celebrate with you in ${wishChannelNotice}!*`
+          )
           .setFooter({ text: message.guild.name, iconURL: message.guild.iconURL({ dynamic: true }) })
           .setTimestamp();
 
         try {
           await message.author.send({ embeds: [dmEmbed] });
         } catch (err) {
-          const tempMsg = await message.channel.send(`🎂 <@${message.author.id}>, your birthday was saved! *(Deleted your message to keep your privacy)*`);
-          setTimeout(() => tempMsg.delete().catch(() => {}), 5000);
+          const tempMsg = await message.channel.send(
+            `🎂 <@${message.author.id}>, your birthday was saved as **${formatted}**!\n*(Deleted your message for privacy. Enable DMs from server members to receive private confirmations!)*`
+          );
+          setTimeout(() => tempMsg.delete().catch(() => {}), 6000);
         }
         return;
       } else if (isBdaySetChannel) {
@@ -163,14 +192,19 @@ module.exports = {
         const errEmbed = new EmbedBuilder()
           .setColor(COLORS.ERROR)
           .setTitle('❌ Invalid Birthday Format')
-          .setDescription(`Hello **${message.author.username}**! In **${message.guild.name}**, please provide your birthday in **DD/MM/YYYY** or **DD/MM** format (e.g. \`24/10/2005\` or \`24/10\`).\n\n🔒 *Your message was deleted to protect your privacy and keep the channel clean.*`)
+          .setDescription(
+            `Hello **${message.author.username}**! In **${message.guild.name}**, please provide your birthday in **DD/MM/YYYY** format (e.g. \`24/10/2005\` or \`24/10\`).\n\n` +
+            `🔒 *Your message was automatically deleted to protect your privacy and keep the channel clean.*`
+          )
           .setFooter({ text: message.guild.name, iconURL: message.guild.iconURL({ dynamic: true }) });
 
         try {
           await message.author.send({ embeds: [errEmbed] });
         } catch (err) {
-          const tempMsg = await message.channel.send(`⚠️ <@${message.author.id}>, please send your birthday in **DD/MM/YYYY** format (e.g. \`24/10/2005\`).`);
-          setTimeout(() => tempMsg.delete().catch(() => {}), 5000);
+          const tempMsg = await message.channel.send(
+            `⚠️ <@${message.author.id}>, please send your birthday in **DD/MM/YYYY** format (e.g. \`24/10/2005\`). *(Deleted for privacy)*`
+          );
+          setTimeout(() => tempMsg.delete().catch(() => {}), 6000);
         }
         return;
       }

@@ -8,14 +8,14 @@ const { EmbedBuilder } = require('discord.js');
 const birthdayService = {
   /**
    * Parse user entered date string
-   * Supported: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, YYYY-MM-DD, DD/MM, MM/DD
+   * Supported: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, YYYY-MM-DD, DD/MM, Month Day
    */
   parseDate(dateStr) {
     if (!dateStr || typeof dateStr !== 'string') return null;
     const clean = dateStr.trim();
 
-    // Check YYYY-MM-DD
-    const isoMatch = clean.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    // 1. Check YYYY-MM-DD
+    const isoMatch = clean.match(/^(\d{4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})$/);
     if (isoMatch) {
       const year = parseInt(isoMatch[1], 10);
       const month = parseInt(isoMatch[2], 10);
@@ -25,12 +25,69 @@ const birthdayService = {
       }
     }
 
-    // Check DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
-    const dmyMatch = clean.match(/^(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{4}))?$/);
+    // 2. Check DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY (supports 2-digit or 4-digit years & spaces)
+    const dmyMatch = clean.match(/^(\d{1,2})\s*[-/.]\s*(\d{1,2})(?:\s*[-/.]\s*(\d{2,4}))?$/);
     if (dmyMatch) {
       const day = parseInt(dmyMatch[1], 10);
       const month = parseInt(dmyMatch[2], 10);
-      const year = dmyMatch[3] ? parseInt(dmyMatch[3], 10) : null;
+      let year = dmyMatch[3] ? parseInt(dmyMatch[3], 10) : null;
+      if (year && year < 100) {
+        year += year < 50 ? 2000 : 1900;
+      }
+      if (this.isValidDate(day, month, year)) {
+        return { day, month, year };
+      }
+    }
+
+    // 3. Check natural language dates like "24 Oct 2005" or "24 October" or "Oct 24 2005"
+    const monthsMap = {
+      jan: 1, january: 1,
+      feb: 2, february: 2,
+      mar: 3, march: 3,
+      apr: 4, april: 4,
+      may: 5,
+      jun: 6, june: 6,
+      jul: 7, july: 7,
+      aug: 8, august: 8,
+      sep: 9, september: 9,
+      oct: 10, october: 10,
+      nov: 11, november: 11,
+      dec: 12, december: 12
+    };
+
+    // Format: "24 Oct 2005" or "24 October"
+    const naturalMatch1 = clean.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([a-zA-Z]+)(?:\s+(\d{2,4}))?$/);
+    if (naturalMatch1) {
+      const day = parseInt(naturalMatch1[1], 10);
+      const mStr = naturalMatch1[2].toLowerCase();
+      const month = monthsMap[mStr];
+      let year = naturalMatch1[3] ? parseInt(naturalMatch1[3], 10) : null;
+      if (year && year < 100) year += year < 50 ? 2000 : 1900;
+      if (month && this.isValidDate(day, month, year)) {
+        return { day, month, year };
+      }
+    }
+
+    // Format: "Oct 24 2005" or "October 24"
+    const naturalMatch2 = clean.match(/^([a-zA-Z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{2,4}))?$/);
+    if (naturalMatch2) {
+      const mStr = naturalMatch2[1].toLowerCase();
+      const month = monthsMap[mStr];
+      const day = parseInt(naturalMatch2[2], 10);
+      let year = naturalMatch2[3] ? parseInt(naturalMatch2[3], 10) : null;
+      if (year && year < 100) year += year < 50 ? 2000 : 1900;
+      if (month && this.isValidDate(day, month, year)) {
+        return { day, month, year };
+      }
+    }
+
+    // 4. Relaxed regex fallback to extract date substring if embedded (e.g. "bday 24/10/2005")
+    const embeddedMatch = clean.match(/(\d{1,2})\s*[-/.]\s*(\d{1,2})(?:\s*[-/.]\s*(\d{2,4}))?/);
+    if (embeddedMatch) {
+      const day = parseInt(embeddedMatch[1], 10);
+      const month = parseInt(embeddedMatch[2], 10);
+      let year = embeddedMatch[3] ? parseInt(embeddedMatch[3], 10) : null;
+      if (year && year < 100) year += year < 50 ? 2000 : 1900;
       if (this.isValidDate(day, month, year)) {
         return { day, month, year };
       }
