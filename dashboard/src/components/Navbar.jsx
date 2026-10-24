@@ -5,6 +5,8 @@ import { Sparkles, LogOut, LayoutDashboard, Shield } from 'lucide-react';
 
 export default function Navbar() {
   const { user, botInfo, logout } = useAuth();
+  const apiBase = import.meta.env.VITE_API_URL || '';
+  const loginUrl = `${apiBase}/api/auth/login`;
 
   return (
     <nav className="h-16 border-b border-aura-border bg-aura-darker/90 backdrop-blur-md sticky top-0 z-50 px-6 flex items-center justify-between">
@@ -74,7 +76,7 @@ export default function Navbar() {
           </div>
         ) : (
           <a
-            href="/api/auth/login"
+            href={loginUrl}
             className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-aura-purple to-aura-red hover:opacity-95 transition shadow-purple-glow text-white"
           >
             <Sparkles className="w-4 h-4" />

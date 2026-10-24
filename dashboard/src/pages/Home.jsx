@@ -17,6 +17,8 @@ import {
 
 export default function Home() {
   const { user, botInfo } = useAuth();
+  const apiBase = import.meta.env.VITE_API_URL || '';
+  const loginUrl = `${apiBase}/api/auth/login`;
 
   const features = [
     {
@@ -101,7 +103,7 @@ export default function Home() {
             </Link>
           ) : (
             <a
-              href="/api/auth/login"
+              href={loginUrl}
               className="px-8 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-aura-purple to-aura-red hover:opacity-95 shadow-purple-glow transition flex items-center gap-2 text-base"
             >
               <Sparkles className="w-5 h-5" />
