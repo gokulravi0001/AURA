@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: aura-discord-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DASHBOARD_URL
+        value: https://dashboard-alpha-lovat.vercel.app
+      - key: BOT_PREFIX
+        value: "+"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false
