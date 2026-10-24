@@ -4,7 +4,7 @@ const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('level-settings')
+    .setName('levels')
     .setDescription('Configure leveling options and announcement channels (Admin only)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand(sub =>
@@ -27,8 +27,9 @@ module.exports = {
         .addIntegerOption(opt => opt.setName('max').setDescription('Maximum XP per message').setRequired(true))
         .addIntegerOption(opt => opt.setName('cooldown').setDescription('Cooldown between messages in seconds').setRequired(true))
     ),
-  name: 'level-settings',
+  name: 'levels',
   description: 'Configure leveling parameters',
+  aliases: ['levelsettings', 'level-settings'],
   permissions: [PermissionFlagsBits.Administrator],
   module: 'leveling',
 
@@ -114,8 +115,7 @@ function buildSettingsEmbed(guild, guildDoc) {
       { name: 'XP Range', value: `\`${lev?.xpMin || 15} - ${lev?.xpMax || 25} XP\``, inline: true },
       { name: 'Cooldown', value: `\`${lev?.cooldownSeconds || 60} seconds\``, inline: true },
       { name: 'Announcement Channel', value: channel, inline: true },
-      { name: 'Role Rewards Configured', value: `\`${rewardsCount} roles\``, inline: true },
-      { name: 'Level Up Message', value: `\`${lev?.levelUpMessage || 'Default'}\`` }
+      { name: 'Role Rewards', value: `\`${rewardsCount} roles\``, inline: true }
     )
     .setFooter({ text: 'Edit anytime via commands or web dashboard' })
     .setTimestamp();

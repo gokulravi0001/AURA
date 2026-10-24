@@ -4,11 +4,11 @@ const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('leaderboard')
+    .setName('top')
     .setDescription('View the top 10 ranked members on this server'),
-  name: 'leaderboard',
+  name: 'top',
   description: 'View the top 10 ranked members on this server',
-  aliases: ['top', 'lb', 'levels'],
+  aliases: ['lb', 'leaderboard', 'levels'],
   module: 'leveling',
 
   async execute(interaction, client) {
@@ -45,8 +45,8 @@ async function buildLeaderboardEmbed(guild, client) {
 
   return new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
-    .setTitle(`🏆 ${guild.name} XP Leaderboard`)
+    .setTitle(`🏆 ${guild.name} Top Members`)
     .setDescription(description)
-    .setFooter({ text: 'Top 10 Members • Chat actively to rise up the ranks!' })
+    .setFooter({ text: 'Top 10 Leaderboard • Chat to rise up the ranks!' })
     .setTimestamp();
 }

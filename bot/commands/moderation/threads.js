@@ -4,7 +4,7 @@ const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('threads')
+    .setName('thread')
     .setDescription('Configure automatic discussion threads for image posts (Admin only)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .addSubcommand(sub =>
@@ -17,19 +17,18 @@ module.exports = {
             .setRequired(true)
         )
         .addStringOption(opt => opt.setName('format').setDescription('Thread name format (e.g. 💬 Discussion - {author})'))
-        .addIntegerOption(opt => opt.setName('duration').setDescription('Auto-archive duration (minutes: 60, 1440, 4320, 10080)'))
     )
     .addSubcommand(sub =>
       sub.setName('status')
         .setDescription('View current image threads configuration')
     )
     .addSubcommand(sub =>
-      sub.setName('disable')
+      sub.setName('off')
         .setDescription('Disable automatic image threads')
     ),
-  name: 'threads',
+  name: 'thread',
   description: 'Manage auto image threads',
-  aliases: ['imagethreads', 'thread-setup'],
+  aliases: ['threads', 'imagethreads'],
   permissions: [PermissionFlagsBits.ManageChannels],
   module: 'image_threads',
 
@@ -40,14 +39,13 @@ module.exports = {
     if (sub === 'setup') {
       const channel = interaction.options.getChannel('channel');
       const format = interaction.options.getString('format') || '💬 Discussion - {author}';
-      const duration = interaction.options.getInteger('duration') || 1440;
 
       guildDoc.modules.image_threads = true;
       guildDoc.imageThreads = {
         enabled: true,
         channelId: channel.id,
         threadNameFormat: format,
-        autoArchiveDuration: duration
+        autoArchiveDuration: 1440
       };
       await guildDoc.save();
 
@@ -56,19 +54,18 @@ module.exports = {
           new EmbedBuilder()
             .setColor(COLORS.SUCCESS)
             .setTitle('💬 Auto Image Threads Configured')
-            .setDescription(`Now monitoring <#${channel.id}>.\nAny qualifying image post will automatically get a thread named \`${format}\`!`)
+            .setDescription(`Now monitoring <#${channel.id}> for image posts!`)
         ]
       });
     }
 
-    if (sub === 'disable') {
+    if (sub === 'off') {
       guildDoc.modules.image_threads = false;
       guildDoc.imageThreads.enabled = false;
       await guildDoc.save();
       return interaction.reply({ content: '❌ Auto image threads disabled.' });
     }
 
-    // status
     return interaction.reply({ embeds: [buildThreadStatusEmbed(interaction.guild, guildDoc)] });
   },
 
@@ -82,7 +79,7 @@ module.exports = {
 
     if (action === 'setup') {
       const channel = message.mentions.channels.first();
-      if (!channel) return message.reply('❌ Usage: `+threads setup #channel`');
+      if (!channel) return message.reply('❌ Usage: `+thread setup #channel`');
 
       guildDoc.modules.image_threads = true;
       guildDoc.imageThreads = {
@@ -95,7 +92,7 @@ module.exports = {
       return message.reply(`💬 Auto image threads enabled for <#${channel.id}>!`);
     }
 
-    if (action === 'disable') {
+    if (action === 'off') {
       guildDoc.modules.image_threads = false;
       guildDoc.imageThreads.enabled = false;
       await guildDoc.save();
@@ -116,9 +113,8 @@ function buildThreadStatusEmbed(guild, guildDoc) {
     .setTitle(`💬 Auto Image Threads — ${guild.name}`)
     .addFields(
       { name: 'Status', value: conf?.enabled ? '✅ Active' : '❌ Disabled', inline: true },
-      { name: 'Monitored Channel', value: channel, inline: true },
-      { name: 'Naming Format', value: `\`${conf?.threadNameFormat || '💬 Discussion - {author}'}\``, inline: true }
+      { name: 'Monitored Channel', value: channel, inline: true }
     )
-    .setFooter({ text: 'Configure with /threads setup or web dashboard' })
+    .setFooter({ text: 'Configure with +thread setup #channel or web dashboard' })
     .setTimestamp();
 }

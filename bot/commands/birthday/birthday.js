@@ -15,7 +15,7 @@ const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('birthday')
+    .setName('bday')
     .setDescription('Register, view, list, or configure birthdays')
     .addSubcommand(sub =>
       sub.setName('set')
@@ -46,9 +46,9 @@ module.exports = {
         )
         .addRoleOption(opt => opt.setName('role').setDescription('Special role to give on member birthdays'))
     ),
-  name: 'birthday',
+  name: 'bday',
   description: 'Register, view, or configure birthdays',
-  aliases: ['bday', 'birthdays'],
+  aliases: ['birthday', 'bd'],
   module: 'birthdays',
 
   async execute(interaction, client, settings) {
@@ -73,12 +73,17 @@ module.exports = {
         );
 
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const formatted = `${parsed.day} ${months[parsed.month - 1]}${parsed.year ? ` ${parsed.year}` : ''}`;
+
+        // Also attempt to send DM confirmation
+        sendBirthdayConfirmationDM(interaction.user, interaction.guild, formatted);
+
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
               .setColor(COLORS.SUCCESS)
               .setTitle('🎂 Birthday Saved!')
-              .setDescription(`Your birthday is set to **${parsed.day} ${months[parsed.month - 1]}${parsed.year ? ` ${parsed.year}` : ''}**!`)
+              .setDescription(`Your birthday is set to **${formatted}**!\n🔒 *Your date was saved privately.*`)
           ],
           ephemeral: true
         });
@@ -109,7 +114,7 @@ module.exports = {
       if (!bday) {
         return interaction.reply({
           content: targetUser.id === interaction.user.id
-            ? '❌ You have not registered your birthday yet. Use `/birthday set` to register!'
+            ? '❌ You have not registered your birthday yet. Use `/bday set` to register!'
             : `❌ <@${targetUser.id}> has not registered their birthday yet.`,
           ephemeral: true
         });
@@ -167,14 +172,14 @@ module.exports = {
   async executePrefix(message, args, client, settings) {
     const action = args[0]?.toLowerCase();
 
-    // +birthday view [@user]
+    // +bday view [@user]
     if (action === 'view') {
       const targetUser = message.mentions.users.first() || message.author;
       const bday = await Birthday.findOne({ guildId: message.guild.id, userId: targetUser.id });
 
       if (!bday) {
         return message.reply(targetUser.id === message.author.id
-          ? '❌ You have not registered your birthday. Type `+birthday DD/MM` to set it!'
+          ? '❌ You have not registered your birthday. Type `+bday DD/MM` to set it!'
           : `❌ <@${targetUser.id}> has not registered their birthday.`);
       }
 
@@ -182,19 +187,19 @@ module.exports = {
       return message.reply({ embeds: [embed] });
     }
 
-    // +birthday list
+    // +bday list
     if (action === 'list') {
       const embed = await getUpcomingBirthdaysEmbed(message.guild);
       return message.reply({ embeds: [embed] });
     }
 
-    // +birthday remove
+    // +bday remove
     if (action === 'remove') {
       await Birthday.deleteOne({ guildId: message.guild.id, userId: message.author.id });
       return message.reply('🗑️ Your birthday has been removed.');
     }
 
-    // +birthday setup <#channel> [@role]
+    // +bday setup <#channel> [@role]
     if (action === 'setup') {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return message.reply('🚫 Administrator permission required.');
@@ -204,7 +209,7 @@ module.exports = {
       const role = message.mentions.roles.first();
 
       if (!channel) {
-        return message.reply('❌ Usage: `+birthday setup #channel [@role]`');
+        return message.reply('❌ Usage: `+bday setup #channel [@role]`');
       }
 
       await Guild.updateOne(
@@ -223,13 +228,18 @@ module.exports = {
       return message.reply(`⚙️ Birthday system configured! Channel: <#${channel.id}>${role ? `, Role: <@&${role.id}>` : ''}.`);
     }
 
-    // +birthday <date>
+    // User provides birthday date directly: e.g. +bday 24/10 or +bday 24/10/2005
     const dateStr = args.join(' ');
     const parsed = birthdayService.parseDate(dateStr);
+
     if (!parsed) {
-      return message.reply('ℹ️ Available subcommands: `view [@user]`, `list`, `remove`, `setup #channel`.\nOr register with `+birthday <DD/MM/YYYY>` or `+birthday <DD/MM>`.');
+      return message.reply('ℹ️ Usage: `+bday <DD/MM>` or `+bday <DD/MM/YYYY>`\n*Subcommands: `+bday view`, `+bday list`, `+bday remove`*');
     }
 
+    // 1. DELETE USER'S MESSAGE IMMEDIATELY (Privacy Protection)
+    await message.delete().catch(() => {});
+
+    // 2. SAVE IN MONGODB
     await Birthday.findOneAndUpdate(
       { guildId: message.guild.id, userId: message.author.id },
       { day: parsed.day, month: parsed.month, year: parsed.year, lastWishedYear: 0 },
@@ -237,9 +247,31 @@ module.exports = {
     );
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return message.reply(`🎂 Your birthday has been set to **${parsed.day} ${months[parsed.month - 1]}${parsed.year ? ` ${parsed.year}` : ''}**!`);
+    const formatted = `${parsed.day} ${months[parsed.month - 1]}${parsed.year ? ` ${parsed.year}` : ''}`;
+
+    // 3. SEND DIRECT MESSAGE TO MEMBER
+    await sendBirthdayConfirmationDM(message.author, message.guild, formatted, message.channel);
   }
 };
+
+async function sendBirthdayConfirmationDM(user, guild, formattedDate, channel = null) {
+  const dmEmbed = new EmbedBuilder()
+    .setColor(COLORS.SUCCESS)
+    .setTitle('🎂 Birthday Successfully Saved!')
+    .setDescription(`Hello **${user.username}**, your birthday has been saved for **${guild.name}**!\n\n📅 **Date:** \`${formattedDate}\`\n\n🔒 **Privacy:** *We automatically deleted your message in the server to protect your personal information. When your special day arrives, we will celebrate with you!* 🎉`)
+    .setFooter({ text: guild.name, iconURL: guild.iconURL({ dynamic: true }) })
+    .setTimestamp();
+
+  try {
+    await user.send({ embeds: [dmEmbed] });
+  } catch (err) {
+    // If user's DMs are disabled, send a self-deleting message in the channel
+    if (channel) {
+      const notice = await channel.send(`🎂 <@${user.id}>, your birthday was saved! *(Deleted your message to protect your privacy)*`);
+      setTimeout(() => notice.delete().catch(() => {}), 6000);
+    }
+  }
+}
 
 function buildBirthdayCard(user, bday) {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -278,7 +310,7 @@ async function getUpcomingBirthdaysEmbed(guild) {
     return new EmbedBuilder()
       .setColor(COLORS.PRIMARY)
       .setTitle(`🎂 Birthdays for ${guild.name}`)
-      .setDescription('No birthdays registered yet! Use `/birthday set` or `+birthday DD/MM` to add yours.');
+      .setDescription('No birthdays registered yet! Use `/bday set` or `+bday DD/MM` to add yours.');
   }
 
   let list = '';
@@ -290,5 +322,5 @@ async function getUpcomingBirthdaysEmbed(guild) {
     .setColor(COLORS.PRIMARY)
     .setTitle(`🎂 Upcoming Birthdays in ${guild.name}`)
     .setDescription(list)
-    .setFooter({ text: 'Register with /birthday set or view with /birthday view' });
+    .setFooter({ text: 'Register with /bday set or view with /bday view' });
 }

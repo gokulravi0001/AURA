@@ -5,7 +5,7 @@ const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('counters')
+    .setName('counter')
     .setDescription('Automated server stat counters setup & management (Admin only)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .addSubcommand(sub =>
@@ -20,9 +20,9 @@ module.exports = {
       sub.setName('remove')
         .setDescription('Delete all voice counter channels and remove category')
     ),
-  name: 'counters',
+  name: 'counter',
   description: 'Manage automated server voice counters',
-  aliases: ['counters-setup', 'countersetup', 'servercounters'],
+  aliases: ['counters', 'counters-setup', 'servercounters'],
   permissions: [PermissionFlagsBits.ManageChannels],
   module: 'voice_counters',
 
@@ -66,7 +66,7 @@ module.exports = {
     if (sub === 'update') {
       const guildDoc = await Guild.findOne({ guildId: guild.id });
       if (!guildDoc?.voiceCounters?.enabled) {
-        return interaction.reply({ content: '⚠️ Voice counters are not configured on this server. Run `/counters setup` first.', ephemeral: true });
+        return interaction.reply({ content: '⚠️ Voice counters are not configured on this server. Run `/counter setup` first.', ephemeral: true });
       }
 
       await interaction.deferReply({ ephemeral: true });

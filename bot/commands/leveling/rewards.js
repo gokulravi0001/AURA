@@ -4,7 +4,7 @@ const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('rewards')
+    .setName('reward')
     .setDescription('View or manage leveling role rewards')
     .addSubcommand(sub =>
       sub.setName('view')
@@ -21,9 +21,9 @@ module.exports = {
         .setDescription('Remove a role reward for a level (Admin only)')
         .addIntegerOption(opt => opt.setName('level').setDescription('Level requirement to remove').setRequired(true))
     ),
-  name: 'rewards',
+  name: 'reward',
   description: 'View or manage leveling role rewards',
-  aliases: ['level-rewards', 'levelrewards', 'rolerewards'],
+  aliases: ['rewards', 'rolerewards', 'levelrewards'],
   module: 'leveling',
 
   async execute(interaction, client, settings) {
@@ -47,7 +47,6 @@ module.exports = {
         return interaction.reply({ content: '❌ Level must be greater than 0.', ephemeral: true });
       }
 
-      // Filter out existing reward for same level if any
       const existing = (guildDoc.leveling.roleRewards || []).filter(r => r.level !== level);
       existing.push({ level, roleId: role.id });
       existing.sort((a, b) => a.level - b.level);
@@ -60,7 +59,7 @@ module.exports = {
           new EmbedBuilder()
             .setColor(COLORS.SUCCESS)
             .setTitle('✨ Role Reward Added')
-            .setDescription(`Members who reach **Level ${level}** will now automatically receive the <@&${role.id}> role!`)
+            .setDescription(`Members who reach **Level ${level}** will now automatically receive <@&${role.id}>!`)
         ]
       });
     }
@@ -105,7 +104,7 @@ module.exports = {
       const role = message.mentions.roles.first() || message.guild.roles.cache.get(args[2]);
 
       if (isNaN(level) || level <= 0 || !role) {
-        return message.reply('❌ Usage: `+rewards add <level> <@role>` (e.g. `+rewards add 5 @VIP`)');
+        return message.reply('❌ Usage: `+reward add <level> <@role>` (e.g. `+reward add 5 @VIP`)');
       }
 
       const existing = (guildDoc.leveling.roleRewards || []).filter(r => r.level !== level);
@@ -125,7 +124,7 @@ module.exports = {
 
       const level = parseInt(args[1], 10);
       if (isNaN(level)) {
-        return message.reply('❌ Usage: `+rewards remove <level>`');
+        return message.reply('❌ Usage: `+reward remove <level>`');
       }
 
       const current = guildDoc.leveling.roleRewards || [];
@@ -150,7 +149,7 @@ function buildRewardsEmbed(guild, guildDoc) {
     return new EmbedBuilder()
       .setColor(COLORS.PRIMARY)
       .setTitle(`🏆 Level Role Rewards — ${guild.name}`)
-      .setDescription('No role rewards have been set yet on this server.\nAdmins can add rewards with `/rewards add <level> <role>` or `+rewards add <level> @role`.')
+      .setDescription('No role rewards set yet on this server.\nAdmins can add rewards with `/reward add <level> <role>` or `+reward add <level> @role`.')
       .setFooter({ text: 'AURA Leveling System' });
   }
 
@@ -163,6 +162,6 @@ function buildRewardsEmbed(guild, guildDoc) {
     .setColor(COLORS.PRIMARY)
     .setTitle(`🏆 Level Role Rewards — ${guild.name}`)
     .setDescription(desc)
-    .setFooter({ text: 'Earn XP by chatting in text channels to unlock roles!' })
+    .setFooter({ text: 'Earn XP by chatting to unlock roles!' })
     .setTimestamp();
 }

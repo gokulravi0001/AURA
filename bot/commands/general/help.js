@@ -27,40 +27,36 @@ module.exports = {
 function buildHelpEmbed(prefix, client) {
   return new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
-    .setTitle('⚡ AURA Multipurpose Bot & Web Dashboard')
-    .setDescription(`AURA is your all-in-one powerhouse bot.\nAll features can be controlled with **Slash commands**, prefix **\`${prefix}\`**, or directly via the **Web Dashboard**!`)
+    .setTitle('⚡ AURA Command Menu')
+    .setDescription(`All commands are short and fast to use with **\`${prefix}\`** or **Slash commands** (\`/\`).\nClick the button below to open the Web Dashboard anytime!`)
     .addFields(
       {
-        name: '📊 XP & Leveling',
-        value: `\`${prefix}rank [user]\` • \`${prefix}leaderboard\` • \`${prefix}rewards [add/remove]\` • \`${prefix}addxp <@user> <amount>\` • \`${prefix}resetxp <@user|all>\` • \`${prefix}level-settings\``
+        name: '🎂 Birthdays (Auto-Delete & DM)',
+        value: `\`${prefix}bday <DD/MM>\` • \`${prefix}bday view [@user]\` • \`${prefix}bday list\` • \`${prefix}bday setup <#chan>\`\n*Automatically saves date, deletes your message for privacy, and DMs confirmation!*`
       },
       {
         name: '🔊 Join-to-Create Voice Lounges',
-        value: `\`${prefix}voice setup\` • \`${prefix}voice lock\` • \`${prefix}voice unlock\` • \`${prefix}voice hide\` • \`${prefix}voice show\` • \`${prefix}voice limit <n>\` • \`${prefix}voice rename <name>\` • \`${prefix}voice transfer <@user>\``
+        value: `\`${prefix}vc setup\` • \`${prefix}vc lock\` • \`${prefix}vc unlock\` • \`${prefix}vc hide\` • \`${prefix}vc show\` • \`${prefix}vc limit <n>\` • \`${prefix}vc name <text>\` • \`${prefix}vc give @user\``
       },
       {
-        name: '🎂 Birthdays',
-        value: `\`${prefix}birthday view [@user]\` • \`${prefix}birthday <DD/MM>\` • \`${prefix}birthday list\` • \`${prefix}birthday remove\` • \`${prefix}birthday setup <#channel> [@role]\``
+        name: '📊 XP & Leveling',
+        value: `\`${prefix}rank [@user]\` • \`${prefix}top\` • \`${prefix}reward [add/remove]\` • \`${prefix}addxp @user <n>\` • \`${prefix}resetxp @user\` • \`${prefix}levels\``
       },
       {
         name: '🎫 Support & Tickets',
-        value: `\`${prefix}ticket panel [#channel]\` • \`${prefix}ticket setup <category> <role>\` • \`${prefix}close\` • \`${prefix}claim\``
+        value: `\`${prefix}ticket panel\` • \`${prefix}ticket setup <cat> <role>\` • \`${prefix}close\` • \`${prefix}claim\``
       },
       {
         name: '📌 Sticky Messages & Image Threads',
-        value: `\`${prefix}sticky <message>\` • \`${prefix}sticky list\` • \`${prefix}sticky remove\` • \`${prefix}threads setup <#channel>\``
-      },
-      {
-        name: '🎮 Interactive Minigames',
-        value: `\`${prefix}rps [@user]\` • \`${prefix}counting [setup <#channel>]\` • \`${prefix}wordchain [setup <#channel>]\``
-      },
-      {
-        name: '🚀 Bump Automation & Reminders',
-        value: `\`${prefix}bump\` • \`${prefix}bump done\` • \`${prefix}bump setup <#channel> [@role] [interval]\``
+        value: `\`${prefix}sticky <text>\` • \`${prefix}sticky list\` • \`${prefix}sticky remove\` • \`${prefix}thread setup <#chan>\``
       },
       {
         name: '📈 Server Counters',
-        value: `\`${prefix}counters setup\` • \`${prefix}counters update\` • \`${prefix}counters remove\``
+        value: `\`${prefix}counter setup\` • \`${prefix}counter update\` • \`${prefix}counter remove\``
+      },
+      {
+        name: '🎮 Games & Bumping',
+        value: `\`${prefix}rps [@user]\` • \`${prefix}trivia\` • \`${prefix}count [setup #chan]\` • \`${prefix}chain [setup #chan]\` • \`${prefix}bump [done|setup]\``
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })

@@ -105,6 +105,40 @@ module.exports = {
       }
     }
 
+    // 3.5. AUTOMATIC BIRTHDAY CHANNEL DETECTION (Delete message & DM user)
+    if (settings?.modules?.birthdays && settings.birthdays?.channelId === message.channel.id) {
+      const birthdayService = require('../../modules/birthdayService');
+      const Birthday = require('../../../models/Birthday');
+      const parsed = birthdayService.parseDate(message.content);
+
+      if (parsed) {
+        await message.delete().catch(() => {});
+        await Birthday.findOneAndUpdate(
+          { guildId: message.guild.id, userId: message.author.id },
+          { day: parsed.day, month: parsed.month, year: parsed.year, lastWishedYear: 0 },
+          { upsert: true }
+        );
+
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const formatted = `${parsed.day} ${months[parsed.month - 1]}${parsed.year ? ` ${parsed.year}` : ''}`;
+
+        const dmEmbed = new EmbedBuilder()
+          .setColor(COLORS.SUCCESS)
+          .setTitle('🎂 Birthday Successfully Saved!')
+          .setDescription(`Hello **${message.author.username}**, your birthday has been saved for **${message.guild.name}**!\n\n📅 **Date:** \`${formatted}\`\n\n🔒 *We automatically deleted your message in the channel to keep your date private. When your birthday arrives, we will celebrate in the server!* 🎉`)
+          .setFooter({ text: message.guild.name, iconURL: message.guild.iconURL({ dynamic: true }) })
+          .setTimestamp();
+
+        try {
+          await message.author.send({ embeds: [dmEmbed] });
+        } catch (err) {
+          const tempMsg = await message.channel.send(`🎂 <@${message.author.id}>, your birthday was saved! *(Deleted your message to keep your privacy)*`);
+          setTimeout(() => tempMsg.delete().catch(() => {}), 6000);
+        }
+        return;
+      }
+    }
+
     // 4. LEVELING XP AWARD
     if (settings?.modules?.leveling && settings.leveling?.enabled) {
       await levelingService.handleMessageXP(message, settings, client);

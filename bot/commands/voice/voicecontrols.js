@@ -10,7 +10,7 @@ const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('voice')
+    .setName('vc')
     .setDescription('Manage your temporary voice lounge or setup Join-to-Create')
     .addSubcommand(sub =>
       sub.setName('setup')
@@ -39,18 +39,18 @@ module.exports = {
         .addIntegerOption(opt => opt.setName('count').setDescription('Max users (0 for unlimited)').setRequired(true))
     )
     .addSubcommand(sub =>
-      sub.setName('rename')
+      sub.setName('name')
         .setDescription('Rename your voice channel')
         .addStringOption(opt => opt.setName('name').setDescription('New channel name').setRequired(true))
     )
     .addSubcommand(sub =>
-      sub.setName('transfer')
+      sub.setName('give')
         .setDescription('Transfer ownership of your channel to another member in the lounge')
         .addUserOption(opt => opt.setName('target').setDescription('Member to transfer ownership to').setRequired(true))
     ),
-  name: 'voice',
+  name: 'vc',
   description: 'Manage temporary voice channels or setup Join-to-Create',
-  aliases: ['vc', 'voice-setup', 'tempvoice'],
+  aliases: ['voice', 'tempvoice'],
   module: 'join_to_create',
 
   async execute(interaction, client, settings) {
@@ -67,13 +67,11 @@ module.exports = {
         const format = interaction.options.getString('format') || "🔊 {username}'s Lounge";
         const guild = interaction.guild;
 
-        // Create Category
         const category = await guild.channels.create({
           name: '🔊 VOICE LOUNGES',
           type: ChannelType.GuildCategory
         });
 
-        // Create Trigger Channel
         const trigger = await guild.channels.create({
           name: '➕ Join to Create',
           type: ChannelType.GuildVoice,
@@ -81,7 +79,6 @@ module.exports = {
           userLimit: 1
         });
 
-        // Save in Guild Database
         await Guild.updateOne(
           { guildId: guild.id },
           {
@@ -127,7 +124,7 @@ module.exports = {
       return interaction.reply({ content: '🚫 Only the channel creator or an administrator can manage this voice lounge.', ephemeral: true });
     }
 
-    // 2. LOCK
+    // LOCK
     if (sub === 'lock') {
       await voiceChannel.permissionOverwrites.edit(interaction.guild.roles.everyone, { Connect: false });
       tempDoc.isLocked = true;
@@ -135,7 +132,7 @@ module.exports = {
       return interaction.reply({ content: '🔒 Voice channel **locked**! Nobody else can connect.', ephemeral: true });
     }
 
-    // 3. UNLOCK
+    // UNLOCK
     if (sub === 'unlock') {
       await voiceChannel.permissionOverwrites.edit(interaction.guild.roles.everyone, { Connect: true });
       tempDoc.isLocked = false;
@@ -143,7 +140,7 @@ module.exports = {
       return interaction.reply({ content: '🔓 Voice channel **unlocked**! Members can connect.', ephemeral: true });
     }
 
-    // 4. HIDE
+    // HIDE
     if (sub === 'hide') {
       await voiceChannel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: false });
       tempDoc.isHidden = true;
@@ -151,7 +148,7 @@ module.exports = {
       return interaction.reply({ content: '👻 Voice channel **hidden** from @everyone.', ephemeral: true });
     }
 
-    // 5. SHOW
+    // SHOW
     if (sub === 'show') {
       await voiceChannel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: true });
       tempDoc.isHidden = false;
@@ -159,7 +156,7 @@ module.exports = {
       return interaction.reply({ content: '👁️ Voice channel is now **visible** to @everyone.', ephemeral: true });
     }
 
-    // 6. LIMIT
+    // LIMIT
     if (sub === 'limit') {
       const count = interaction.options.getInteger('count');
       if (count < 0 || count > 99) return interaction.reply({ content: '❌ Limit must be between 0 and 99.', ephemeral: true });
@@ -167,15 +164,15 @@ module.exports = {
       return interaction.reply({ content: `👥 User limit set to **${count === 0 ? 'unlimited' : count}**.`, ephemeral: true });
     }
 
-    // 7. RENAME
-    if (sub === 'rename') {
+    // NAME
+    if (sub === 'name' || sub === 'rename') {
       const newName = interaction.options.getString('name').substring(0, 100);
       await voiceChannel.setName(newName);
       return interaction.reply({ content: `✏️ Channel renamed to **"${newName}"**.`, ephemeral: true });
     }
 
-    // 8. TRANSFER
-    if (sub === 'transfer') {
+    // GIVE (transfer)
+    if (sub === 'give' || sub === 'transfer') {
       const targetUser = interaction.options.getUser('target');
       if (targetUser.id === interaction.user.id) {
         return interaction.reply({ content: '❌ You already own this channel.', ephemeral: true });
@@ -189,7 +186,6 @@ module.exports = {
       tempDoc.ownerId = targetUser.id;
       await tempDoc.save();
 
-      // Give new owner permissions
       await voiceChannel.permissionOverwrites.edit(targetUser.id, {
         ManageChannels: true,
         MoveMembers: true,
@@ -204,7 +200,7 @@ module.exports = {
   async executePrefix(message, args, client, settings) {
     const action = args[0]?.toLowerCase();
 
-    // Setup command: +voice setup
+    // +vc setup
     if (action === 'setup') {
       if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
         return message.reply('🚫 Administrator permission required.');
@@ -242,7 +238,7 @@ module.exports = {
 
     const voiceChannel = message.member?.voice?.channel;
     if (!voiceChannel) {
-      return message.reply('❌ You must be inside your temporary voice channel. (Or use `+voice setup` as an admin).');
+      return message.reply('❌ You must be connected to your temporary voice channel. (Or use `+vc setup` as an admin).');
     }
 
     const tempDoc = await TempVoice.findOne({ channelId: voiceChannel.id });
@@ -268,22 +264,22 @@ module.exports = {
       return message.reply('👁️ Voice channel visible.');
     } else if (action === 'limit') {
       const count = parseInt(args[1], 10);
-      if (isNaN(count)) return message.reply('❌ Usage: `+voice limit <number>`');
+      if (isNaN(count)) return message.reply('❌ Usage: `+vc limit <number>`');
       await voiceChannel.setUserLimit(count);
-      return message.reply(`👥 User limit updated to **${count}**.`);
-    } else if (action === 'rename') {
+      return message.reply(`👥 User limit set to **${count}**.`);
+    } else if (action === 'name' || action === 'rename') {
       const newName = args.slice(1).join(' ');
-      if (!newName) return message.reply('❌ Usage: `+voice rename <new name>`');
+      if (!newName) return message.reply('❌ Usage: `+vc name <new name>`');
       await voiceChannel.setName(newName);
       return message.reply(`✏️ Channel renamed to **"${newName}"**.`);
-    } else if (action === 'transfer') {
+    } else if (action === 'give' || action === 'transfer') {
       const targetUser = message.mentions.users.first();
-      if (!targetUser) return message.reply('❌ Usage: `+voice transfer @member`');
+      if (!targetUser) return message.reply('❌ Usage: `+vc give @member`');
       tempDoc.ownerId = targetUser.id;
       await tempDoc.save();
       return message.reply(`👑 Transferred ownership to <@${targetUser.id}>.`);
     } else {
-      return message.reply('ℹ️ Available subcommands: `setup`, `lock`, `unlock`, `hide`, `show`, `limit <n>`, `rename <name>`, `transfer @member`.');
+      return message.reply('ℹ️ Quick commands: `+vc setup`, `+vc lock`, `+vc unlock`, `+vc hide`, `+vc show`, `+vc limit <n>`, `+vc name <name>`, `+vc give @member`.');
     }
   }
 };
