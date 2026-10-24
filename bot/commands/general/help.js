@@ -51,8 +51,8 @@ function buildHelpEmbed(prefix, client) {
         value: `\`${prefix}sticky <text>\` • \`${prefix}sticky list\` • \`${prefix}sticky remove\` • \`${prefix}thread setup <#chan>\``
       },
       {
-        name: '📈 Server Counters',
-        value: `\`${prefix}counter setup\` • \`${prefix}counter update\` • \`${prefix}counter remove\``
+        name: '📈 Server Counters & Invite Tracker',
+        value: `\`${prefix}inv [@user]\` • \`${prefix}inv top\` • \`${prefix}inv setup <#chan>\` • \`${prefix}counter setup\` • \`${prefix}counter update\``
       },
       {
         name: '🎮 Games & Bumping',

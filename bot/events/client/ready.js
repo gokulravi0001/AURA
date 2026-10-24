@@ -3,6 +3,7 @@ const logger = require('../../../shared/logger');
 const birthdayService = require('../../modules/birthdayService');
 const bumpService = require('../../modules/bumpService');
 const stickyService = require('../../modules/stickyService');
+const inviteService = require('../../modules/inviteService');
 
 module.exports = {
   name: 'ready',
@@ -28,7 +29,8 @@ module.exports = {
       birthdayService.init(client);
       bumpService.init(client);
       await stickyService.loadCache();
-      logger.info('Background schedulers & caches initialized (Birthdays, Bump Reminders, Sticky Messages).');
+      await inviteService.init(client);
+      logger.info('Background schedulers & caches initialized (Birthdays, Bump Reminders, Sticky Messages, Invites).');
     } catch (err) {
       logger.error('Error starting background schedulers:', err.message);
     }

@@ -28,7 +28,8 @@ module.exports = {
     BIRTHDAYS: 'birthdays',
     MINIGAMES: 'minigames',
     TICKETS: 'tickets',
-    BUMP_REMINDER: 'bump_reminder'
+    BUMP_REMINDER: 'bump_reminder',
+    INVITE_TRACKER: 'invite_tracker'
   },
 
   // Default Guild Configuration
@@ -44,7 +45,8 @@ module.exports = {
       birthdays: true,
       minigames: true,
       tickets: true,
-      bump_reminder: true
+      bump_reminder: true,
+      invite_tracker: true
     },
     language: 'en',
     timezone: 'UTC'

@@ -95,6 +95,7 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   const birthday = require('../bot/commands/birthday/birthday');
   const games = require('../bot/commands/games/games');
   const bump = require('../bot/commands/bump/bump');
+  const invites = require('../bot/commands/utility/invites');
 
   assert.ok(ping.data && ping.executePrefix);
   assert.ok(help.data && help.executePrefix);
@@ -105,6 +106,7 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   assert.ok(birthday.data && birthday.executePrefix);
   assert.ok(games.data && games.executePrefix);
   assert.ok(bump.data && bump.executePrefix);
+  assert.ok(invites.data && invites.executePrefix);
 });
 
 // 6. Sticky & Birthday Channel Separation Check
@@ -118,6 +120,22 @@ test('Features: Sticky cache and Birthday Channel schema', () => {
   const schema = Guild.schema.obj;
   assert.ok(schema.birthdays.setChannelId !== undefined);
   assert.ok(schema.birthdays.wishChannelId !== undefined);
+});
+
+// 7. Invite Tracker Check
+test('Features: Invite Tracker model & service', () => {
+  const Invite = require('../models/Invite');
+  const MemberInvite = require('../models/MemberInvite');
+  const inviteService = require('../bot/modules/inviteService');
+
+  assert.ok(Invite);
+  assert.ok(MemberInvite);
+  assert.strictEqual(typeof inviteService.init, 'function');
+  assert.strictEqual(typeof inviteService.handleMemberJoin, 'function');
+  assert.strictEqual(typeof inviteService.handleMemberLeave, 'function');
+
+  const testInv = new Invite({ guildId: '123', userId: '456', regular: 5, bonus: 2, left: 1, fake: 1 });
+  assert.strictEqual(testInv.total, 5); // (5 + 2) - 1 - 1 = 5
 });
 
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);

@@ -18,7 +18,8 @@ const GuildSchema = new mongoose.Schema({
     birthdays: { type: Boolean, default: true },
     minigames: { type: Boolean, default: true },
     tickets: { type: Boolean, default: true },
-    bump_reminder: { type: Boolean, default: true }
+    bump_reminder: { type: Boolean, default: true },
+    invite_tracker: { type: Boolean, default: true }
   },
 
   leveling: {
@@ -109,6 +110,13 @@ const GuildSchema = new mongoose.Schema({
     usedWords: [{ type: String }],
     currentStreak: { type: Number, default: 0 },
     highScore: { type: Number, default: 0 }
+  },
+
+  inviteTracker: {
+    enabled: { type: Boolean, default: true },
+    channelId: { type: String, default: null },
+    joinMessage: { type: String, default: '👋 Welcome {user} to **{server}**! Invited by **{inviter}** (**{total}** invites) using code `{code}`.' },
+    leaveMessage: { type: String, default: '📤 **{user}** left the server. Invited by **{inviter}** (**{total}** invites).' }
   }
 }, {
   timestamps: true
