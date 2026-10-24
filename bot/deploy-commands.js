@@ -32,15 +32,41 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN)
       return;
     }
 
-    logger.info(`Started refreshing ${commands.length} application (/) commands.`);
+    logger.info(`Found ${commands.length} current AURA slash commands to register.`);
 
-    // Global deployment
+    // 1. Fetch all guilds the bot belongs to and clear old guild-specific commands
+    try {
+      const guilds = await rest.get(Routes.userGuilds());
+      logger.info(`Checking ${guilds.length} guilds for old/legacy guild commands...`);
+
+      for (const guild of guilds) {
+        try {
+          const oldGuildCmds = await rest.get(Routes.applicationGuildCommands(clientId, guild.id));
+          if (oldGuildCmds && oldGuildCmds.length > 0) {
+            logger.info(`Purging ${oldGuildCmds.length} legacy commands from guild: ${guild.name} (${guild.id})`);
+            await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: [] });
+          }
+        } catch (e) {
+          // Non-critical if bot lacks access to a specific guild's command list
+        }
+      }
+    } catch (err) {
+      logger.warn('Could not inspect guild-specific commands:', err.message);
+    }
+
+    // 2. Overwrite all Global application commands with ONLY the new AURA commands
+    logger.info('Overwriting global application slash commands...');
     const data = await rest.put(
       Routes.applicationCommands(clientId),
       { body: commands }
     );
 
-    logger.success(`Successfully registered ${data.length} global application (/) commands.`);
+    logger.success(`=================================================`);
+    logger.success(`  SUCCESSFULLY REPLACED ALL BOT COMMANDS!`);
+    logger.success(`  Total Live Slash Commands: ${data.length}`);
+    logger.success(`  Registered: ${data.map(c => '/' + c.name).join(', ')}`);
+    logger.success(`  MongoDB user data (birthdays, etc.) was NOT touched.`);
+    logger.success(`=================================================`);
   } catch (error) {
     logger.error('Error deploying commands:', error);
   }
