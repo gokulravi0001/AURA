@@ -1,0 +1,47 @@
+{
+  "name": "aura-discord-bot",
+  "version": "1.0.0",
+  "description": "AURA - All-In-One Multipurpose Discord Bot with Web Dashboard",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "deploy:commands": "node bot/deploy-commands.js",
+    "dashboard:install": "cd dashboard && npm install",
+    "dashboard:dev": "cd dashboard && npm run dev",
+    "dashboard:build": "cd dashboard && npm run build",
+    "test": "node tests/run-tests.js"
+  },
+  "keywords": [
+    "discord-bot",
+    "discord.js",
+    "dashboard",
+    "react",
+    "tailwind",
+    "leveling",
+    "tickets",
+    "voice",
+    "sticky-messages",
+    "birthday",
+    "minigames",
+    "bump-reminder"
+  ],
+  "author": "AURA Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.8.1",
+    "connect-mongo": "^5.1.0",
+    "cors": "^2.8.5",
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "express-session": "^1.18.1",
+    "mongoose": "^8.12.0",
+    "node-cron": "^3.0.3",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
