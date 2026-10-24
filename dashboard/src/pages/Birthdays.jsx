@@ -85,20 +85,46 @@ export default function Birthdays() {
           <h3 className="font-bold text-lg text-white">General Birthday Settings</h3>
 
           <div>
-            <label className="block text-xs font-semibold text-aura-textMuted mb-1.5">Announcement Channel</label>
+            <label className="block text-xs font-semibold text-aura-textMuted mb-1.5">Wish Announcement Channel</label>
             <select
-              value={settings.birthdays?.channelId || ''}
+              value={settings.birthdays?.wishChannelId || settings.birthdays?.channelId || ''}
               onChange={(e) => setSettings({
                 ...settings,
-                birthdays: { ...settings.birthdays, channelId: e.target.value || null }
+                birthdays: {
+                  ...settings.birthdays,
+                  wishChannelId: e.target.value || null,
+                  channelId: e.target.value || null
+                }
               })}
               className="w-full px-3.5 py-2 rounded-xl bg-aura-darker border border-aura-border text-white text-sm focus:outline-none focus:border-aura-purple"
             >
-              <option value="">Select Channel...</option>
+              <option value="">Select Wish Channel...</option>
               {textChannels.map(c => (
                 <option key={c.id} value={c.id}>#{c.name}</option>
               ))}
             </select>
+            <span className="text-[11px] text-aura-textMuted mt-1 block">Where the bot publicly sends birthday celebrations and pings celebrants.</span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-aura-textMuted mb-1.5">Member Registration Channel (DD/MM/YYYY)</label>
+            <select
+              value={settings.birthdays?.setChannelId || ''}
+              onChange={(e) => setSettings({
+                ...settings,
+                birthdays: {
+                  ...settings.birthdays,
+                  setChannelId: e.target.value || null
+                }
+              })}
+              className="w-full px-3.5 py-2 rounded-xl bg-aura-darker border border-aura-border text-white text-sm focus:outline-none focus:border-aura-purple"
+            >
+              <option value="">Select Input Channel (Optional)...</option>
+              {textChannels.map(c => (
+                <option key={c.id} value={c.id}>#{c.name}</option>
+              ))}
+            </select>
+            <span className="text-[11px] text-aura-textMuted mt-1 block">Members type their birthdate in DD/MM/YYYY format here. The bot deletes their message immediately and DMs confirmation!</span>
           </div>
 
           <div>

@@ -107,6 +107,19 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   assert.ok(bump.data && bump.executePrefix);
 });
 
+// 6. Sticky & Birthday Channel Separation Check
+test('Features: Sticky cache and Birthday Channel schema', () => {
+  const stickyService = require('../bot/modules/stickyService');
+  assert.strictEqual(typeof stickyService.loadCache, 'function');
+  assert.strictEqual(typeof stickyService.updateCache, 'function');
+  assert.strictEqual(typeof stickyService.handleMessage, 'function');
+
+  const Guild = require('../models/Guild');
+  const schema = Guild.schema.obj;
+  assert.ok(schema.birthdays.setChannelId !== undefined);
+  assert.ok(schema.birthdays.wishChannelId !== undefined);
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);

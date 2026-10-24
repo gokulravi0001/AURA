@@ -31,8 +31,8 @@ function buildHelpEmbed(prefix, client) {
     .setDescription(`All commands are short and fast to use with **\`${prefix}\`** or **Slash commands** (\`/\`).\nClick the button below to open the Web Dashboard anytime!`)
     .addFields(
       {
-        name: '🎂 Birthdays (Auto-Delete & DM)',
-        value: `\`${prefix}bday <DD/MM>\` • \`${prefix}bday view [@user]\` • \`${prefix}bday list\` • \`${prefix}bday setup <#chan>\`\n*Automatically saves date, deletes your message for privacy, and DMs confirmation!*`
+        name: '🎂 Birthdays (Auto-Delete & DM Confirmation)',
+        value: `\`${prefix}bday <DD/MM/YYYY>\` • \`${prefix}bday view [@user]\` • \`${prefix}bday list\` • \`${prefix}bday setup <#wish> [#set]\` • \`${prefix}bday setchannel <#chan>\`\n*In the input channel, typing \`DD/MM/YYYY\` auto-deletes the message for privacy and DMs confirmation! Wishes are sent to the wish channel.*`
       },
       {
         name: '🔊 Join-to-Create Voice Lounges',

@@ -44,15 +44,29 @@ module.exports = {
 
         if (command) {
           // Check module enabled
-          if (command.module && settings && settings.modules[command.module] === false) {
-            return message.reply({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(COLORS.ERROR)
-                  .setTitle('⚠️ Module Disabled')
-                  .setDescription(`The **${command.module}** module is disabled on this server.`)
-              ]
-            }).catch(() => {});
+          const subAction = args[0]?.toLowerCase();
+          const isSetupSubcommand = ['setup', 'set', 'panel', 'enable', 'config', 'status', 'view', 'list', 'help'].includes(subAction);
+          const isAdmin = message.member?.permissions?.has(PermissionsBitField.Flags.Administrator);
+
+          if (command.module && settings && settings.modules && settings.modules[command.module] === false) {
+            if (isAdmin || isSetupSubcommand) {
+              settings.modules[command.module] = true;
+              const Guild = require('../../../models/Guild');
+              await Guild.updateOne(
+                { guildId: message.guild.id },
+                { $set: { [`modules.${command.module}`]: true } },
+                { upsert: true }
+              ).catch(() => {});
+            } else {
+              return message.reply({
+                embeds: [
+                  new EmbedBuilder()
+                    .setColor(COLORS.ERROR)
+                    .setTitle('⚠️ Module Disabled')
+                    .setDescription(`The **${command.module}** module is disabled on this server. An administrator can enable it with \`+${resolvedName} setup\`.`)
+                ]
+              }).catch(() => {});
+            }
           }
 
           // Permission check
@@ -106,13 +120,18 @@ module.exports = {
     }
 
     // 3.5. AUTOMATIC BIRTHDAY CHANNEL DETECTION (Delete message & DM user)
-    if (settings?.modules?.birthdays && settings.birthdays?.channelId === message.channel.id) {
+    const isBdaySetChannel = settings?.birthdays?.setChannelId && settings.birthdays.setChannelId === message.channel.id;
+    const isBdayLegacyChannel = !settings?.birthdays?.setChannelId && settings?.birthdays?.channelId === message.channel.id;
+
+    if (settings?.modules?.birthdays !== false && (isBdaySetChannel || isBdayLegacyChannel)) {
       const birthdayService = require('../../modules/birthdayService');
       const Birthday = require('../../../models/Birthday');
       const parsed = birthdayService.parseDate(message.content);
 
+      // Always delete message from birthday set channel to maintain privacy & clean channel
+      await message.delete().catch(() => {});
+
       if (parsed) {
-        await message.delete().catch(() => {});
         await Birthday.findOneAndUpdate(
           { guildId: message.guild.id, userId: message.author.id },
           { day: parsed.day, month: parsed.month, year: parsed.year, lastWishedYear: 0 },
@@ -121,11 +140,14 @@ module.exports = {
 
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const formatted = `${parsed.day} ${months[parsed.month - 1]}${parsed.year ? ` ${parsed.year}` : ''}`;
+        const wishChannelNotice = settings.birthdays?.wishChannelId
+          ? `<#${settings.birthdays.wishChannelId}>`
+          : 'the server announcements channel';
 
         const dmEmbed = new EmbedBuilder()
           .setColor(COLORS.SUCCESS)
           .setTitle('🎂 Birthday Successfully Saved!')
-          .setDescription(`Hello **${message.author.username}**, your birthday has been saved for **${message.guild.name}**!\n\n📅 **Date:** \`${formatted}\`\n\n🔒 *We automatically deleted your message in the channel to keep your date private. When your birthday arrives, we will celebrate in the server!* 🎉`)
+          .setDescription(`Hello **${message.author.username}**, your birthday has been saved for **${message.guild.name}**!\n\n📅 **Date:** \`${formatted}\`\n\n🔒 *We automatically deleted your message in the channel to keep your date private.*\n🎉 *When your special day arrives, we will celebrate in ${wishChannelNotice}!*`)
           .setFooter({ text: message.guild.name, iconURL: message.guild.iconURL({ dynamic: true }) })
           .setTimestamp();
 
@@ -133,7 +155,22 @@ module.exports = {
           await message.author.send({ embeds: [dmEmbed] });
         } catch (err) {
           const tempMsg = await message.channel.send(`🎂 <@${message.author.id}>, your birthday was saved! *(Deleted your message to keep your privacy)*`);
-          setTimeout(() => tempMsg.delete().catch(() => {}), 6000);
+          setTimeout(() => tempMsg.delete().catch(() => {}), 5000);
+        }
+        return;
+      } else if (isBdaySetChannel) {
+        // User typed invalid format in dedicated set channel
+        const errEmbed = new EmbedBuilder()
+          .setColor(COLORS.ERROR)
+          .setTitle('❌ Invalid Birthday Format')
+          .setDescription(`Hello **${message.author.username}**! In **${message.guild.name}**, please provide your birthday in **DD/MM/YYYY** or **DD/MM** format (e.g. \`24/10/2005\` or \`24/10\`).\n\n🔒 *Your message was deleted to protect your privacy and keep the channel clean.*`)
+          .setFooter({ text: message.guild.name, iconURL: message.guild.iconURL({ dynamic: true }) });
+
+        try {
+          await message.author.send({ embeds: [errEmbed] });
+        } catch (err) {
+          const tempMsg = await message.channel.send(`⚠️ <@${message.author.id}>, please send your birthday in **DD/MM/YYYY** format (e.g. \`24/10/2005\`).`);
+          setTimeout(() => tempMsg.delete().catch(() => {}), 5000);
         }
         return;
       }
@@ -145,7 +182,7 @@ module.exports = {
     }
 
     // 5. STICKY MESSAGES (Repost / update sticky near bottom)
-    if (settings?.modules?.sticky_messages) {
+    if (settings?.modules?.sticky_messages !== false) {
       await stickyService.handleMessage(message, settings);
     }
   }

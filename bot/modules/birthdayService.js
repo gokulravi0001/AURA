@@ -118,13 +118,16 @@ const birthdayService = {
       const currentDay = now.getUTCDate();
 
       // Find guilds with birthdays module enabled
-      const guilds = await Guild.find({ 'modules.birthdays': true, 'birthdays.enabled': true });
+      const guilds = await Guild.find({
+        'modules.birthdays': { $ne: false },
+        'birthdays.enabled': { $ne: false }
+      });
 
       for (const guildConfig of guilds) {
         const guild = client.guilds.cache.get(guildConfig.guildId);
         if (!guild) continue;
 
-        const announcementChannelId = guildConfig.birthdays.channelId;
+        const announcementChannelId = guildConfig.birthdays.wishChannelId || guildConfig.birthdays.channelId;
         const channel = announcementChannelId ? guild.channels.cache.get(announcementChannelId) : null;
         if (!channel || !channel.isTextBased()) continue;
 

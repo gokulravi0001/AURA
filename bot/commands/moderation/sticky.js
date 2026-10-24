@@ -38,6 +38,13 @@ module.exports = {
       const text = interaction.options.getString('text');
       const title = interaction.options.getString('title');
 
+      const Guild = require('../../../models/Guild');
+      await Guild.updateOne(
+        { guildId },
+        { $set: { 'modules.sticky_messages': true } },
+        { upsert: true }
+      );
+
       const sticky = await StickyMessage.findOneAndUpdate(
         { channelId: channel.id },
         {
@@ -50,12 +57,14 @@ module.exports = {
         { upsert: true, new: true }
       );
 
+      stickyService.updateCache(channel.id, true);
       await stickyService.repostSticky(channel, sticky);
       return interaction.reply({ content: `📌 Sticky message configured and posted in <#${channel.id}>!`, ephemeral: true });
     }
 
     if (sub === 'remove') {
       const channel = interaction.options.getChannel('channel') || interaction.channel;
+      stickyService.updateCache(channel.id, false);
       const removed = await StickyMessage.findOneAndDelete({ channelId: channel.id });
       if (removed && removed.lastMessageId) {
         const oldMsg = await channel.messages.fetch(removed.lastMessageId).catch(() => null);
@@ -81,6 +90,7 @@ module.exports = {
     }
 
     if (action === 'remove') {
+      stickyService.updateCache(channel.id, false);
       const removed = await StickyMessage.findOneAndDelete({ channelId: channel.id });
       if (removed && removed.lastMessageId) {
         const old = await channel.messages.fetch(removed.lastMessageId).catch(() => null);
@@ -94,6 +104,13 @@ module.exports = {
       return message.reply('❌ Usage: `+sticky <message text>` or `+sticky remove` or `+sticky list`');
     }
 
+    const Guild = require('../../../models/Guild');
+    await Guild.updateOne(
+      { guildId },
+      { $set: { 'modules.sticky_messages': true } },
+      { upsert: true }
+    );
+
     const sticky = await StickyMessage.findOneAndUpdate(
       { channelId: channel.id },
       {
@@ -105,6 +122,7 @@ module.exports = {
       { upsert: true, new: true }
     );
 
+    stickyService.updateCache(channel.id, true);
     await stickyService.repostSticky(channel, sticky);
     return message.reply(`📌 Sticky message set and posted in <#${channel.id}>!`);
   }

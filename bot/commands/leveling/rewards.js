@@ -28,7 +28,8 @@ module.exports = {
 
   async execute(interaction, client, settings) {
     const sub = interaction.options.getSubcommand();
-    const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+    let guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+    if (!guildDoc) guildDoc = await Guild.create({ guildId: interaction.guild.id });
 
     if (sub === 'view') {
       const embed = buildRewardsEmbed(interaction.guild, guildDoc);
@@ -93,7 +94,8 @@ module.exports = {
 
   async executePrefix(message, args, client, settings) {
     const action = args[0]?.toLowerCase();
-    const guildDoc = await Guild.findOne({ guildId: message.guild.id });
+    let guildDoc = await Guild.findOne({ guildId: message.guild.id });
+    if (!guildDoc) guildDoc = await Guild.create({ guildId: message.guild.id });
 
     if (action === 'add') {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {

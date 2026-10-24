@@ -37,12 +37,17 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub.setName('setup')
-        .setDescription('Configure birthday announcement channel and role (Admin only)')
+        .setDescription('Configure birthday wish channel and registration channel (Admin only)')
         .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Announcement channel for birthday wishes')
+          opt.setName('wish_channel')
+            .setDescription('Channel where birthday wishes and celebrant pings are posted')
             .addChannelTypes(ChannelType.GuildText)
             .setRequired(true)
+        )
+        .addChannelOption(opt =>
+          opt.setName('set_channel')
+            .setDescription('Channel where members type their birthday in DD/MM/YYYY (auto-deleted & saved)')
+            .addChannelTypes(ChannelType.GuildText)
         )
         .addRoleOption(opt => opt.setName('role').setDescription('Special role to give on member birthdays'))
     ),
@@ -142,7 +147,8 @@ module.exports = {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
 
-      const channel = interaction.options.getChannel('channel');
+      const wishChannel = interaction.options.getChannel('wish_channel') || interaction.options.getChannel('channel');
+      const setChannel = interaction.options.getChannel('set_channel');
       const role = interaction.options.getRole('role');
 
       await Guild.updateOne(
@@ -151,19 +157,40 @@ module.exports = {
           $set: {
             'modules.birthdays': true,
             'birthdays.enabled': true,
-            'birthdays.channelId': channel.id,
+            'birthdays.wishChannelId': wishChannel.id,
+            'birthdays.setChannelId': setChannel ? setChannel.id : null,
+            'birthdays.channelId': wishChannel.id, // fallback
             'birthdays.roleId': role ? role.id : null
           }
         },
         { upsert: true }
       );
 
+      // Post instructional banner in setChannel if designated
+      if (setChannel) {
+        const guideEmbed = new EmbedBuilder()
+          .setColor(COLORS.PRIMARY)
+          .setTitle('🎂 Birthday Registration Channel')
+          .setDescription(
+            'Type your birthday in this channel using **DD/MM/YYYY** format (e.g. `24/10/2005` or `24/10`)!\n\n' +
+            '🔒 **Privacy Protection:** *Your message will be automatically deleted immediately so nobody sees your date.*\n' +
+            '📩 You will receive a direct message confirmation from AURA.\n' +
+            `🎉 When your birthday arrives, we will celebrate with you in <#${wishChannel.id}>!`
+          )
+          .setFooter({ text: 'AURA Birthday System' });
+        await setChannel.send({ embeds: [guideEmbed] }).catch(() => {});
+      }
+
       return interaction.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(COLORS.SUCCESS)
             .setTitle('⚙️ Birthday System Configured')
-            .setDescription(`Wishes will be posted in <#${channel.id}>.${role ? ` Birthday role: <@&${role.id}>.` : ''}`)
+            .setDescription(
+              `🎉 **Wish Channel:** <#${wishChannel.id}>\n` +
+              `📝 **Member Input Channel:** ${setChannel ? `<#${setChannel.id}> *(auto-deletes messages & DMs confirmation)*` : '*Not set (use `/bday set` or configure input channel)*'}\n` +
+              `${role ? `⭐ **Birthday Role:** <@&${role.id}>\n` : ''}`
+            )
         ]
       });
     }
@@ -199,17 +226,63 @@ module.exports = {
       return message.reply('🗑️ Your birthday has been removed.');
     }
 
-    // +bday setup <#channel> [@role]
+    // +bday setchannel <#channel>
+    if (action === 'setchannel') {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return message.reply('🚫 Administrator permission required.');
+      }
+      const setCh = message.mentions.channels.first();
+      if (!setCh) return message.reply('❌ Usage: `+bday setchannel #channel`');
+
+      await Guild.updateOne(
+        { guildId: message.guild.id },
+        { $set: { 'modules.birthdays': true, 'birthdays.enabled': true, 'birthdays.setChannelId': setCh.id } },
+        { upsert: true }
+      );
+
+      const guideEmbed = new EmbedBuilder()
+        .setColor(COLORS.PRIMARY)
+        .setTitle('🎂 Birthday Registration Channel')
+        .setDescription(
+          'Type your birthday in this channel using **DD/MM/YYYY** format (e.g. `24/10/2005` or `24/10`)!\n\n' +
+          '🔒 **Privacy Protection:** *Your message will be automatically deleted immediately so nobody sees your date.*\n' +
+          '📩 You will receive a direct message confirmation from AURA.'
+        )
+        .setFooter({ text: 'AURA Birthday System' });
+      await setCh.send({ embeds: [guideEmbed] }).catch(() => {});
+
+      return message.reply(`📝 Birthday input channel set to <#${setCh.id}>! Members can type their birthday in \`DD/MM/YYYY\` format and messages will be auto-deleted & saved.`);
+    }
+
+    // +bday wishchannel <#channel>
+    if (action === 'wishchannel') {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return message.reply('🚫 Administrator permission required.');
+      }
+      const wishCh = message.mentions.channels.first();
+      if (!wishCh) return message.reply('❌ Usage: `+bday wishchannel #channel`');
+
+      await Guild.updateOne(
+        { guildId: message.guild.id },
+        { $set: { 'modules.birthdays': true, 'birthdays.enabled': true, 'birthdays.wishChannelId': wishCh.id, 'birthdays.channelId': wishCh.id } },
+        { upsert: true }
+      );
+      return message.reply(`🎉 Birthday wish announcement channel set to <#${wishCh.id}>!`);
+    }
+
+    // +bday setup <#wish-channel> [#set-channel] [@role]
     if (action === 'setup') {
       if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return message.reply('🚫 Administrator permission required.');
       }
 
-      const channel = message.mentions.channels.first();
+      const channels = message.mentions.channels;
+      const wishChannel = channels.first();
+      const setChannel = channels.size > 1 ? [...channels.values()][1] : null;
       const role = message.mentions.roles.first();
 
-      if (!channel) {
-        return message.reply('❌ Usage: `+bday setup #channel [@role]`');
+      if (!wishChannel) {
+        return message.reply('❌ Usage: `+bday setup #wish-channel [#set-channel] [@role]`');
       }
 
       await Guild.updateOne(
@@ -218,14 +291,35 @@ module.exports = {
           $set: {
             'modules.birthdays': true,
             'birthdays.enabled': true,
-            'birthdays.channelId': channel.id,
+            'birthdays.wishChannelId': wishChannel.id,
+            'birthdays.channelId': wishChannel.id,
+            'birthdays.setChannelId': setChannel ? setChannel.id : null,
             'birthdays.roleId': role ? role.id : null
           }
         },
         { upsert: true }
       );
 
-      return message.reply(`⚙️ Birthday system configured! Channel: <#${channel.id}>${role ? `, Role: <@&${role.id}>` : ''}.`);
+      if (setChannel) {
+        const guideEmbed = new EmbedBuilder()
+          .setColor(COLORS.PRIMARY)
+          .setTitle('🎂 Birthday Registration Channel')
+          .setDescription(
+            'Type your birthday in this channel using **DD/MM/YYYY** format (e.g. `24/10/2005` or `24/10`)!\n\n' +
+            '🔒 **Privacy Protection:** *Your message will be automatically deleted immediately so nobody sees your date.*\n' +
+            '📩 You will receive a direct message confirmation from AURA.\n' +
+            `🎉 When your birthday arrives, we will celebrate with you in <#${wishChannel.id}>!`
+          )
+          .setFooter({ text: 'AURA Birthday System' });
+        await setChannel.send({ embeds: [guideEmbed] }).catch(() => {});
+      }
+
+      return message.reply(
+        `⚙️ Birthday system configured!\n` +
+        `🎉 Wish Channel: <#${wishChannel.id}>\n` +
+        `${setChannel ? `📝 Input Channel: <#${setChannel.id}>\n` : ''}` +
+        `${role ? `⭐ Role: <@&${role.id}>` : ''}`
+      );
     }
 
     // User provides birthday date directly: e.g. +bday 24/10 or +bday 24/10/2005

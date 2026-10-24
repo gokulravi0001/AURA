@@ -23,16 +23,33 @@ module.exports = {
           : null;
 
         // Module enabled check if command belongs to a specific module
-        if (command.module && settings && settings.modules[command.module] === false) {
-          return interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(COLORS.ERROR)
-                .setTitle('⚠️ Module Disabled')
-                .setDescription(`The **${command.module}** module is disabled on this server. An administrator can enable it in the dashboard or via settings.`)
-            ],
-            ephemeral: true
-          });
+        let sub = null;
+        try { sub = interaction.options.getSubcommand(false); } catch (e) {}
+
+        const isSetupSubcommand = ['setup', 'set', 'panel', 'enable', 'config', 'status', 'view', 'list'].includes(sub);
+        const isAdmin = interaction.member?.permissions?.has(PermissionsBitField.Flags.Administrator);
+
+        if (command.module && settings && settings.modules && settings.modules[command.module] === false) {
+          if (isAdmin || isSetupSubcommand) {
+            // Auto re-enable module when administrator configures or runs it
+            settings.modules[command.module] = true;
+            const Guild = require('../../../models/Guild');
+            await Guild.updateOne(
+              { guildId: interaction.guildId },
+              { $set: { [`modules.${command.module}`]: true } },
+              { upsert: true }
+            ).catch(() => {});
+          } else {
+            return interaction.reply({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(COLORS.ERROR)
+                  .setTitle('⚠️ Module Disabled')
+                  .setDescription(`The **${command.module}** module is currently disabled on this server. An administrator can enable or configure it using \`/${command.name} setup\`.`)
+              ],
+              ephemeral: true
+            });
+          }
         }
 
         // Permission check

@@ -1,41 +1,104 @@
 const StickyMessage = require('../../models/StickyMessage');
 const logger = require('../../shared/logger');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 
-// Lock map to prevent concurrent repost race conditions
-const processingChannels = new Set();
+// Debounce timers per channel
+const channelTimers = new Map();
+// In-flight repost locks
+const repostLocks = new Set();
+// Fast in-memory cache of channel IDs with active sticky messages
+let activeStickyChannelIds = new Set();
+let cacheLoaded = false;
 
 const stickyService = {
   /**
-   * Handle incoming message in a channel that might have a sticky message
+   * Pre-load active sticky channel IDs into fast memory cache
+   */
+  async loadCache() {
+    try {
+      const stickies = await StickyMessage.find({ enabled: true }).select('channelId');
+      activeStickyChannelIds = new Set(stickies.map(s => s.channelId));
+      cacheLoaded = true;
+    } catch (err) {
+      logger.error('Failed to load sticky messages cache:', err.message);
+    }
+  },
+
+  /**
+   * Register or unregister channel in memory cache
+   */
+  updateCache(channelId, isEnabled) {
+    if (isEnabled) {
+      activeStickyChannelIds.add(channelId);
+    } else {
+      activeStickyChannelIds.delete(channelId);
+      if (channelTimers.has(channelId)) {
+        clearTimeout(channelTimers.get(channelId));
+        channelTimers.delete(channelId);
+      }
+    }
+  },
+
+  /**
+   * Handle incoming message in a channel
    */
   async handleMessage(message, settings) {
+    if (!message || !message.channel || !message.channel.isTextBased()) return;
+
     const channelId = message.channel.id;
-    if (processingChannels.has(channelId)) return;
+
+    // Fast check: is this channel known to have an active sticky message?
+    if (cacheLoaded && !activeStickyChannelIds.has(channelId)) {
+      return;
+    }
 
     try {
       const sticky = await StickyMessage.findOne({ channelId, enabled: true });
-      if (!sticky) return;
+      if (!sticky) {
+        if (cacheLoaded) activeStickyChannelIds.delete(channelId);
+        return;
+      }
+
+      // Ensure cache is synced
+      activeStickyChannelIds.add(channelId);
 
       // Do not trigger on our own sticky message
       if (sticky.lastMessageId === message.id) return;
 
-      sticky.messagesSinceLastPost += 1;
-
-      // Check threshold and cooldown
-      const now = Date.now();
-      const lastPosted = sticky.lastPostedAt ? new Date(sticky.lastPostedAt).getTime() : 0;
-      const cooldownMs = (sticky.cooldownSeconds || 4) * 1000;
-
-      if (sticky.messagesSinceLastPost >= (sticky.messageThreshold || 2) && (now - lastPosted >= cooldownMs)) {
-        processingChannels.add(channelId);
-        await this.repostSticky(message.channel, sticky);
-        processingChannels.delete(channelId);
-      } else {
-        await sticky.save();
+      // Reset existing debounce timer for this channel
+      if (channelTimers.has(channelId)) {
+        clearTimeout(channelTimers.get(channelId));
       }
+
+      // Schedule repost with 1200ms debounce
+      const timer = setTimeout(async () => {
+        channelTimers.delete(channelId);
+        if (repostLocks.has(channelId)) return;
+
+        repostLocks.add(channelId);
+        try {
+          // Re-fetch latest sticky doc in case it was edited/removed
+          const freshSticky = await StickyMessage.findOne({ channelId, enabled: true });
+          if (!freshSticky) return;
+
+          // Check if channel's last message is already our sticky message
+          const recentMessages = await message.channel.messages.fetch({ limit: 1 }).catch(() => null);
+          const lastMsg = recentMessages ? recentMessages.first() : null;
+
+          if (lastMsg && lastMsg.id === freshSticky.lastMessageId) {
+            return; // Already at the absolute bottom
+          }
+
+          await this.repostSticky(message.channel, freshSticky);
+        } catch (err) {
+          logger.warn(`Sticky repost debounce error in ${channelId}: ${err.message}`);
+        } finally {
+          repostLocks.delete(channelId);
+        }
+      }, 1200);
+
+      channelTimers.set(channelId, timer);
     } catch (err) {
-      processingChannels.delete(channelId);
       logger.error('Error handling sticky message:', err.message);
     }
   },
@@ -45,7 +108,9 @@ const stickyService = {
    */
   async repostSticky(channel, sticky) {
     try {
-      // 1. Delete previous sticky message if still present
+      if (!channel || !channel.isTextBased()) return;
+
+      // 1. Delete previous sticky message if present
       if (sticky.lastMessageId) {
         try {
           const oldMsg = await channel.messages.fetch(sticky.lastMessageId).catch(() => null);
@@ -67,7 +132,11 @@ const stickyService = {
 
         if (sticky.embedData.title) embed.setTitle(sticky.embedData.title);
         if (sticky.embedData.description) embed.setDescription(sticky.embedData.description);
-        if (sticky.embedData.footer) embed.setFooter({ text: sticky.embedData.footer });
+        if (sticky.embedData.footer) {
+          embed.setFooter({ text: sticky.embedData.footer });
+        } else {
+          embed.setFooter({ text: '📌 Sticky Message' });
+        }
 
         payload.embeds = [embed];
       }

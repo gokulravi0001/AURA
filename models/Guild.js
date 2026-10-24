@@ -11,14 +11,14 @@ const GuildSchema = new mongoose.Schema({
   modules: {
     leveling: { type: Boolean, default: true },
     statistics: { type: Boolean, default: true },
-    voice_counters: { type: Boolean, default: false },
-    join_to_create: { type: Boolean, default: false },
-    sticky_messages: { type: Boolean, default: false },
-    image_threads: { type: Boolean, default: false },
-    birthdays: { type: Boolean, default: false },
+    voice_counters: { type: Boolean, default: true },
+    join_to_create: { type: Boolean, default: true },
+    sticky_messages: { type: Boolean, default: true },
+    image_threads: { type: Boolean, default: true },
+    birthdays: { type: Boolean, default: true },
     minigames: { type: Boolean, default: true },
-    tickets: { type: Boolean, default: false },
-    bump_reminder: { type: Boolean, default: false }
+    tickets: { type: Boolean, default: true },
+    bump_reminder: { type: Boolean, default: true }
   },
 
   leveling: {
@@ -63,7 +63,9 @@ const GuildSchema = new mongoose.Schema({
   },
 
   birthdays: {
-    enabled: { type: Boolean, default: false },
+    enabled: { type: Boolean, default: true },
+    setChannelId: { type: String, default: null },
+    wishChannelId: { type: String, default: null },
     channelId: { type: String, default: null },
     roleId: { type: String, default: null },
     message: { type: String, default: '🎂 Happy Birthday {user}! Wishing you an awesome day! 🎉' },

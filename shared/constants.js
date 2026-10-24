@@ -37,14 +37,14 @@ module.exports = {
     modules: {
       leveling: true,
       statistics: true,
-      voice_counters: false,
-      join_to_create: false,
-      sticky_messages: false,
-      image_threads: false,
-      birthdays: false,
+      voice_counters: true,
+      join_to_create: true,
+      sticky_messages: true,
+      image_threads: true,
+      birthdays: true,
       minigames: true,
-      tickets: false,
-      bump_reminder: false
+      tickets: true,
+      bump_reminder: true
     },
     language: 'en',
     timezone: 'UTC'

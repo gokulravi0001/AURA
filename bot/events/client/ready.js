@@ -2,6 +2,7 @@ const { ActivityType } = require('discord.js');
 const logger = require('../../../shared/logger');
 const birthdayService = require('../../modules/birthdayService');
 const bumpService = require('../../modules/bumpService');
+const stickyService = require('../../modules/stickyService');
 
 module.exports = {
   name: 'ready',
@@ -22,11 +23,12 @@ module.exports = {
       status: 'online'
     });
 
-    // Initialize Background Schedulers
+    // Initialize Background Schedulers & Caches
     try {
       birthdayService.init(client);
       bumpService.init(client);
-      logger.info('Background schedulers initialized (Birthdays & Bump Reminders).');
+      await stickyService.loadCache();
+      logger.info('Background schedulers & caches initialized (Birthdays, Bump Reminders, Sticky Messages).');
     } catch (err) {
       logger.error('Error starting background schedulers:', err.message);
     }

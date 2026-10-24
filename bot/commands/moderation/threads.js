@@ -34,7 +34,10 @@ module.exports = {
 
   async execute(interaction, client) {
     const sub = interaction.options.getSubcommand();
-    const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+    let guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+    if (!guildDoc) {
+      guildDoc = await Guild.create({ guildId: interaction.guild.id });
+    }
 
     if (sub === 'setup') {
       const channel = interaction.options.getChannel('channel');
@@ -75,7 +78,10 @@ module.exports = {
     }
 
     const action = args[0]?.toLowerCase();
-    const guildDoc = await Guild.findOne({ guildId: message.guild.id });
+    let guildDoc = await Guild.findOne({ guildId: message.guild.id });
+    if (!guildDoc) {
+      guildDoc = await Guild.create({ guildId: message.guild.id });
+    }
 
     if (action === 'setup') {
       const channel = message.mentions.channels.first();
