@@ -3,15 +3,17 @@ const logger = require('../../shared/logger');
 
 const countingService = {
   async handleMessage(message, settings) {
+    if (!message || !message.content || message.author.bot) return false;
+
     const content = message.content.trim();
     // Check if the message is purely a number
-    if (!/^\d+$/.test(content)) return false;
+    if (!/^-?\d+$/.test(content)) return false;
 
     const submittedNumber = parseInt(content, 10);
     const counting = settings.countingGame || { currentNumber: 0, lastUserId: null, allowConsecutive: false, highScore: 0 };
     const expectedNumber = (counting.currentNumber || 0) + 1;
 
-    // Check consecutive user
+    // Check consecutive user (same user counting twice in a row)
     if (!counting.allowConsecutive && counting.lastUserId === message.author.id && counting.currentNumber > 0) {
       await message.react('❌').catch(() => {});
       const brokenCount = counting.currentNumber;
@@ -26,6 +28,10 @@ const countingService = {
           }
         }
       );
+      if (settings.countingGame) {
+        settings.countingGame.currentNumber = 0;
+        settings.countingGame.lastUserId = null;
+      }
       return true;
     }
 
@@ -44,10 +50,14 @@ const countingService = {
           }
         }
       );
+      if (settings.countingGame) {
+        settings.countingGame.currentNumber = 0;
+        settings.countingGame.lastUserId = null;
+      }
       return true;
     }
 
-    // Correct Number!
+    // Correct Number! React with ✅ (Right)
     await message.react('✅').catch(() => {});
     const newHighScore = Math.max(counting.highScore || 0, submittedNumber);
 
@@ -65,6 +75,11 @@ const countingService = {
         }
       }
     );
+    if (settings.countingGame) {
+      settings.countingGame.currentNumber = submittedNumber;
+      settings.countingGame.lastUserId = message.author.id;
+      settings.countingGame.highScore = newHighScore;
+    }
 
     return true;
   }

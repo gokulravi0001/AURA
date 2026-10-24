@@ -98,15 +98,39 @@ module.exports = {
     }
 
     // 2. MINIGAMES (Counting & Word Chain)
-    if (settings?.modules?.minigames) {
-      // Counting Channel Check
-      if (settings.countingGame?.enabled && settings.countingGame.channelId === message.channel.id) {
+    if (settings?.modules?.minigames !== false) {
+      const channelName = message.channel.name?.toLowerCase() || '';
+
+      // Counting Channel Check (Configured OR auto-detected by channel name)
+      const isCountingChannel = settings?.countingGame?.channelId === message.channel.id ||
+        (!settings?.countingGame?.channelId && (channelName === 'counting' || channelName === 'count' || channelName.includes('counting')));
+
+      if (isCountingChannel) {
+        if (!settings?.countingGame?.channelId) {
+          const Guild = require('../../../models/Guild');
+          await Guild.updateOne(
+            { guildId: message.guild.id },
+            { $set: { 'countingGame.enabled': true, 'countingGame.channelId': message.channel.id } }
+          ).catch(() => {});
+          if (settings?.countingGame) settings.countingGame.channelId = message.channel.id;
+        }
         const handled = await countingService.handleMessage(message, settings);
         if (handled) return;
       }
 
-      // Word Chain Channel Check
-      if (settings.wordChainGame?.enabled && settings.wordChainGame.channelId === message.channel.id) {
+      // Word Chain / Word Building Channel Check (Configured OR auto-detected by channel name)
+      const isWordChainChannel = settings?.wordChainGame?.channelId === message.channel.id ||
+        (!settings?.wordChainGame?.channelId && (channelName === 'word-chain' || channelName === 'wordchain' || channelName === 'wordbuilding' || channelName === 'word-building' || channelName.includes('word-chain') || channelName.includes('wordbuilding')));
+
+      if (isWordChainChannel) {
+        if (!settings?.wordChainGame?.channelId) {
+          const Guild = require('../../../models/Guild');
+          await Guild.updateOne(
+            { guildId: message.guild.id },
+            { $set: { 'wordChainGame.enabled': true, 'wordChainGame.channelId': message.channel.id } }
+          ).catch(() => {});
+          if (settings?.wordChainGame) settings.wordChainGame.channelId = message.channel.id;
+        }
         const handled = await wordChainService.handleMessage(message, settings);
         if (handled) return;
       }

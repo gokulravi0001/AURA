@@ -138,6 +138,16 @@ test('Features: Invite Tracker model & service', () => {
   assert.strictEqual(testInv.total, 5); // (5 + 2) - 1 - 1 = 5
 });
 
+// 8. Minigames Handlers & Reaction Check
+test('Features: Counting and Word Chain Services', () => {
+  const countingService = require('../bot/modules/countingService');
+  const wordChainService = require('../bot/modules/wordChainService');
+
+  assert.strictEqual(typeof countingService.handleMessage, 'function');
+  assert.strictEqual(typeof wordChainService.handleMessage, 'function');
+  assert.strictEqual(typeof wordChainService.resetGame, 'function');
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);
