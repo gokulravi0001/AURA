@@ -43,6 +43,20 @@ async function startAura() {
     logger.info('Set your token in .env and restart to connect to Discord.');
   }
 
+  // 5. Keep-Alive Self-Ping (Prevents Render Free Tier from spinning down after 15m)
+  const publicUrl = process.env.RENDER_EXTERNAL_URL || 'https://aura-discord-bot-yg5a.onrender.com';
+  const axios = require('axios');
+  const PING_INTERVAL = 8 * 60 * 1000; // Ping every 8 minutes (Render sleep threshold is 15 minutes)
+
+  setInterval(async () => {
+    try {
+      await axios.get(`${publicUrl}/api/bot/info`, { timeout: 15000 });
+      logger.info(`[Keep-Alive] Pinged ${publicUrl} to keep bot active 24/7.`);
+    } catch (err) {
+      // Non-critical, ignore transient network drops
+    }
+  }, PING_INTERVAL);
+
   // Graceful Shutdown
   const shutdown = async () => {
     logger.info('Shutting down AURA gracefully...');
