@@ -173,7 +173,7 @@ module.exports = {
     ),
   name: 'modules',
   description: 'Manage and toggle bot features selectively',
-  aliases: ['module', 'feature', 'features', 'toggle'],
+  aliases: ['module', 'feature', 'features', 'toggle', 'disable', 'enable', 'turnoff', 'turnon', 'off', 'on', 'settings'],
   permissions: [PermissionFlagsBits.Administrator],
 
   async execute(interaction, client, settings) {
@@ -259,8 +259,24 @@ module.exports = {
       return message.reply('🚫 Administrator permission required.');
     }
 
-    const action = args[0]?.toLowerCase();
-    const rawTarget = args[1]?.toLowerCase();
+    const prefix = settings?.prefix || '+';
+    const invoked = message.content.slice(prefix.length).trim().split(/ +/)[0]?.toLowerCase();
+
+    let action = args[0]?.toLowerCase();
+    let rawTarget = args[1]?.toLowerCase();
+
+    // Smart alias remapping when command is invoked as +disable, +turnoff, +enable, +toggle, etc.
+    if (invoked === 'disable' || invoked === 'turnoff' || invoked === 'off') {
+      action = 'off';
+      rawTarget = args[0]?.toLowerCase();
+    } else if (invoked === 'enable' || invoked === 'turnon' || invoked === 'on') {
+      action = 'on';
+      rawTarget = args[0]?.toLowerCase();
+    } else if (invoked === 'toggle') {
+      action = 'toggle';
+      rawTarget = args[0]?.toLowerCase();
+    }
+
     const guildId = message.guild.id;
 
     // +modules on/enable <feature|all>

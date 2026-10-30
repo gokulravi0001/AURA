@@ -34,24 +34,21 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN)
 
     logger.info(`Found ${commands.length} current AURA slash commands to register.`);
 
-    // 1. Fetch all guilds the bot belongs to and clear old guild-specific commands
+    // 1. Fetch all guilds the bot belongs to and deploy slash commands directly to each guild (INSTANT update)
     try {
       const guilds = await rest.get(Routes.userGuilds());
-      logger.info(`Checking ${guilds.length} guilds for old/legacy guild commands...`);
+      logger.info(`Deploying ${commands.length} slash commands directly to ${guilds.length} guilds for instant client visibility...`);
 
       for (const guild of guilds) {
         try {
-          const oldGuildCmds = await rest.get(Routes.applicationGuildCommands(clientId, guild.id));
-          if (oldGuildCmds && oldGuildCmds.length > 0) {
-            logger.info(`Purging ${oldGuildCmds.length} legacy commands from guild: ${guild.name} (${guild.id})`);
-            await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: [] });
-          }
+          await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: commands });
+          logger.success(`✓ Instantly registered ${commands.length} slash commands in guild: ${guild.name} (${guild.id})`);
         } catch (e) {
-          // Non-critical if bot lacks access to a specific guild's command list
+          logger.warn(`Could not register commands directly to guild ${guild.name}:`, e.message);
         }
       }
     } catch (err) {
-      logger.warn('Could not inspect guild-specific commands:', err.message);
+      logger.warn('Could not inspect guilds for direct deployment:', err.message);
     }
 
     // 2. Overwrite all Global application commands with ONLY the new AURA commands
