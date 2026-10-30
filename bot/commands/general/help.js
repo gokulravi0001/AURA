@@ -57,6 +57,10 @@ function buildHelpEmbed(prefix, client) {
       {
         name: '🎮 Games & Bumping',
         value: `\`${prefix}rps [@user]\` • \`${prefix}trivia\` • \`${prefix}count [setup #chan]\` • \`${prefix}chain [setup #chan]\` • \`${prefix}bump [done|setup]\``
+      },
+      {
+        name: '⚙️ Modular Feature Controls (Turn Features ON/OFF)',
+        value: `\`${prefix}modules\` • \`${prefix}modules on <feature|all>\` • \`${prefix}modules off <feature|all>\` • \`${prefix}modules toggle <feature>\`\n*Interactively enable or disable any bot feature selectively with dropdown menus & buttons!*`
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })

@@ -96,6 +96,7 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   const games = require('../bot/commands/games/games');
   const bump = require('../bot/commands/bump/bump');
   const invites = require('../bot/commands/utility/invites');
+  const modulesCmd = require('../bot/commands/general/modules');
 
   assert.ok(ping.data && ping.executePrefix);
   assert.ok(help.data && help.executePrefix);
@@ -107,6 +108,7 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   assert.ok(games.data && games.executePrefix);
   assert.ok(bump.data && bump.executePrefix);
   assert.ok(invites.data && invites.executePrefix);
+  assert.ok(modulesCmd.data && modulesCmd.executePrefix);
 });
 
 // 6. Sticky & Birthday Channel Separation Check
@@ -165,6 +167,19 @@ test('Features: Temp Voice Manager & Interactive Control Panel', () => {
   };
 
   const panel = voiceManager.buildControlPanel({ id: 'chan_123', name: 'Test Lounge' }, mockMember);
+  assert.ok(panel.embeds && panel.embeds.length === 1);
+  assert.ok(panel.components && panel.components.length === 2);
+});
+
+// 10. Modular Features Control Panel Check
+test('Features: Modules Command & Panel Builder', () => {
+  const modulesCmd = require('../bot/commands/general/modules');
+  assert.strictEqual(typeof modulesCmd.buildModulesPanel, 'function');
+  assert.ok(modulesCmd.MODULE_DEFINITIONS.length >= 10);
+  assert.strictEqual(modulesCmd.MODULE_ALIASES['leveling'], 'leveling');
+  assert.strictEqual(modulesCmd.MODULE_ALIASES['vc'], 'join_to_create');
+
+  const panel = modulesCmd.buildModulesPanel({ modules: { leveling: false, tickets: true } }, { name: 'Test Server' });
   assert.ok(panel.embeds && panel.embeds.length === 1);
   assert.ok(panel.components && panel.components.length === 2);
 });

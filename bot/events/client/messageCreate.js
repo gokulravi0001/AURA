@@ -45,11 +45,11 @@ module.exports = {
         if (command) {
           // Check module enabled
           const subAction = args[0]?.toLowerCase();
-          const isSetupSubcommand = ['setup', 'set', 'panel', 'enable', 'config', 'status', 'view', 'list', 'help'].includes(subAction);
+          const isSetupSubcommand = ['setup', 'enable', 'config'].includes(subAction);
           const isAdmin = message.member?.permissions?.has(PermissionsBitField.Flags.Administrator);
 
           if (command.module && settings && settings.modules && settings.modules[command.module] === false) {
-            if (isAdmin || isSetupSubcommand) {
+            if (isSetupSubcommand && isAdmin) {
               settings.modules[command.module] = true;
               const Guild = require('../../../models/Guild');
               await Guild.updateOne(
@@ -63,7 +63,7 @@ module.exports = {
                   new EmbedBuilder()
                     .setColor(COLORS.ERROR)
                     .setTitle('⚠️ Module Disabled')
-                    .setDescription(`The **${command.module}** module is disabled on this server. An administrator can enable it with \`+${resolvedName} setup\`.`)
+                    .setDescription(`The **${command.module}** module is disabled on this server.\nAn administrator can enable it with \`+modules on ${command.module}\` or view the menu with \`+modules\`.`)
                 ]
               }).catch(() => {});
             }

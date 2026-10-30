@@ -26,11 +26,11 @@ module.exports = {
         let sub = null;
         try { sub = interaction.options.getSubcommand(false); } catch (e) {}
 
-        const isSetupSubcommand = ['setup', 'set', 'panel', 'enable', 'config', 'status', 'view', 'list'].includes(sub);
+        const isSetupSubcommand = ['setup', 'enable', 'config'].includes(sub);
         const isAdmin = interaction.member?.permissions?.has(PermissionsBitField.Flags.Administrator);
 
         if (command.module && settings && settings.modules && settings.modules[command.module] === false) {
-          if (isAdmin || isSetupSubcommand) {
+          if (isSetupSubcommand && isAdmin) {
             // Auto re-enable module when administrator configures or runs it
             settings.modules[command.module] = true;
             const Guild = require('../../../models/Guild');
@@ -45,7 +45,7 @@ module.exports = {
                 new EmbedBuilder()
                   .setColor(COLORS.ERROR)
                   .setTitle('⚠️ Module Disabled')
-                  .setDescription(`The **${command.module}** module is currently disabled on this server. An administrator can enable or configure it using \`/${command.name} setup\`.`)
+                  .setDescription(`The **${command.module}** module is currently disabled on this server.\nAn administrator can enable it using \`/modules enable feature:${command.module}\` or view the menu with \`/modules\`.`)
               ],
               ephemeral: true
             });
@@ -103,6 +103,41 @@ module.exports = {
           return;
         }
 
+        // Module management buttons: btn_modules_enable_all, btn_modules_disable_all, btn_modules_refresh
+        if (customId.startsWith('btn_modules_')) {
+          if (!interaction.member?.permissions?.has(PermissionsBitField.Flags.Administrator)) {
+            return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
+          }
+
+          const modulesCommand = require('../../commands/general/modules');
+          const guildId = interaction.guildId;
+
+          if (customId === 'btn_modules_enable_all') {
+            const updateData = {};
+            modulesCommand.MODULE_DEFINITIONS.forEach(m => { updateData[`modules.${m.key}`] = true; });
+            const updated = await guildService.updateSettings(guildId, updateData);
+            const panel = modulesCommand.buildModulesPanel(updated, interaction.guild);
+            await interaction.update({ embeds: panel.embeds, components: panel.components });
+            return;
+          }
+
+          if (customId === 'btn_modules_disable_all') {
+            const updateData = {};
+            modulesCommand.MODULE_DEFINITIONS.forEach(m => { updateData[`modules.${m.key}`] = false; });
+            const updated = await guildService.updateSettings(guildId, updateData);
+            const panel = modulesCommand.buildModulesPanel(updated, interaction.guild);
+            await interaction.update({ embeds: panel.embeds, components: panel.components });
+            return;
+          }
+
+          if (customId === 'btn_modules_refresh') {
+            const current = await guildService.getSettings(guildId);
+            const panel = modulesCommand.buildModulesPanel(current, interaction.guild);
+            await interaction.update({ embeds: panel.embeds, components: panel.components });
+            return;
+          }
+        }
+
         // Custom registered button handlers
         const handler = client.buttons.get(customId);
         if (handler) {
@@ -144,6 +179,30 @@ module.exports = {
       // 4. Handle String Select Menus
       else if (interaction.isStringSelectMenu()) {
         const customId = interaction.customId;
+
+        // Module toggle select menu
+        if (customId === 'select_module_toggle') {
+          if (!interaction.member?.permissions?.has(PermissionsBitField.Flags.Administrator)) {
+            return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
+          }
+
+          const modulesCommand = require('../../commands/general/modules');
+          const guildId = interaction.guildId;
+          const selectedKey = interaction.values[0];
+
+          const current = await guildService.getSettings(guildId);
+          const currentVal = current?.modules?.[selectedKey] !== false;
+          const newVal = !currentVal;
+
+          const updated = await guildService.updateSettings(guildId, {
+            [`modules.${selectedKey}`]: newVal
+          });
+
+          const panel = modulesCommand.buildModulesPanel(updated, interaction.guild);
+          await interaction.update({ embeds: panel.embeds, components: panel.components });
+          return;
+        }
+
         const handler = client.selectMenus.get(customId);
         if (handler) {
           await handler(interaction, client);
