@@ -14,7 +14,7 @@ module.exports = {
       const settings = await guildService.getSettings(guild.id);
 
       // 1. Join-to-Create Voice Channels
-      if (settings?.modules?.join_to_create && settings.joinToCreate?.enabled) {
+      if (settings?.modules?.join_to_create !== false && settings?.joinToCreate?.enabled) {
         await voiceManager.handleVoiceStateUpdate(oldState, newState, settings, client);
       }
 

@@ -18,17 +18,28 @@ const voiceManager = {
    * Handle member joining or leaving voice
    */
   async handleVoiceStateUpdate(oldState, newState, settings, client) {
-    const triggerChannelId = settings.joinToCreate.channelId;
-    if (!triggerChannelId) return;
+    const triggerChannelId = settings.joinToCreate?.channelId;
+    const categoryId = settings.joinToCreate?.categoryId;
+
+    const joinedChannel = newState.channel;
+    const isTrigger = joinedChannel && (
+      (triggerChannelId && joinedChannel.id === triggerChannelId) ||
+      (categoryId && joinedChannel.parentId === categoryId && joinedChannel.name.toLowerCase().includes('join to create')) ||
+      joinedChannel.name.includes('➕ Join to Create')
+    );
 
     // 1. User Joined the "Join to Create" trigger channel
-    if (newState.channelId === triggerChannelId) {
+    if (isTrigger) {
       await this.createTemporaryChannel(newState, settings);
     }
 
     // 2. User Left a voice channel -> check if it was an empty temporary channel
     if (oldState.channelId && oldState.channelId !== triggerChannelId) {
-      await this.checkEmptyChannel(oldState.channel);
+      const guild = oldState.guild || newState.guild;
+      const oldChannel = oldState.channel || guild?.channels?.cache?.get(oldState.channelId);
+      if (oldChannel) {
+        await this.checkEmptyChannel(oldChannel);
+      }
     }
   },
 
@@ -134,34 +145,42 @@ const voiceManager = {
     if (!guild || !member) return;
 
     try {
-      const parentCategory = settings.joinToCreate.categoryId || voiceState.channel?.parentId;
-      const rawFormat = settings.joinToCreate.channelNameFormat || "🔊 {username}'s Lounge";
+      // Validate parent category exists
+      let parentCategory = settings.joinToCreate?.categoryId || voiceState.channel?.parentId;
+      if (parentCategory) {
+        const cat = guild.channels.cache.get(parentCategory) || await guild.channels.fetch(parentCategory).catch(() => null);
+        if (!cat) parentCategory = null;
+      }
+
+      const rawFormat = settings.joinToCreate?.channelNameFormat || "🔊 {username}'s Lounge";
       const channelName = rawFormat
         .replace(/{username}/g, member.user.username)
         .replace(/{tag}/g, member.user.tag);
+
+      const botId = guild.members.me?.id || voiceState.client?.user?.id;
 
       // Create private/custom channel with permissions allowing member and bot to talk/read
       const newChannel = await guild.channels.create({
         name: channelName,
         type: ChannelType.GuildVoice,
         parent: parentCategory || undefined,
-        userLimit: settings.joinToCreate.userLimit || 0,
-        bitrate: settings.joinToCreate.bitrate || 64000,
+        userLimit: settings.joinToCreate?.userLimit || 0,
+        bitrate: settings.joinToCreate?.bitrate || 64000,
         permissionOverwrites: [
           {
             id: member.id,
             allow: [
-              PermissionsBitField.Flags.ManageChannels,
-              PermissionsBitField.Flags.MoveMembers,
               PermissionsBitField.Flags.Connect,
               PermissionsBitField.Flags.Speak,
+              PermissionsBitField.Flags.Stream,
               PermissionsBitField.Flags.ViewChannel,
               PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.ReadMessageHistory
+              PermissionsBitField.Flags.ReadMessageHistory,
+              PermissionsBitField.Flags.UseVAD
             ]
           },
           {
-            id: guild.members.me.id,
+            id: botId,
             allow: [
               PermissionsBitField.Flags.ManageChannels,
               PermissionsBitField.Flags.MoveMembers,
@@ -176,19 +195,36 @@ const voiceManager = {
         ]
       });
 
-      // Move member into new channel
-      await member.voice.setChannel(newChannel);
-
-      // Send the interactive customization control panel
-      const panelMessageId = await this.sendControlPanel(newChannel, member);
-
-      // Record temporary channel in MongoDB
-      await TempVoice.create({
+      // Record temporary channel in MongoDB immediately so it is tracked
+      const tempDoc = await TempVoice.create({
         guildId: guild.id,
         channelId: newChannel.id,
         ownerId: member.id,
-        panelMessageId: panelMessageId || null
+        panelMessageId: null
       });
+
+      // Move member into new channel safely
+      try {
+        await member.voice.setChannel(newChannel);
+      } catch (moveErr) {
+        logger.warn(`Could not move member ${member.user.tag} into temp voice: ${moveErr.message}`);
+        // Notify member if bot lacks MoveMembers permission in the guild
+        try {
+          const triggerChan = voiceState.channel;
+          if (triggerChan && triggerChan.isVoiceBased()) {
+            await triggerChan.send({
+              content: `⚠️ <@${member.id}>, your room <#${newChannel.id}> was created, but I couldn't move you automatically. Please ensure the bot role has the **Move Members** permission in Server Settings!`
+            }).catch(() => {});
+          }
+        } catch (_) {}
+      }
+
+      // Send the interactive customization control panel
+      const panelMessageId = await this.sendControlPanel(newChannel, member);
+      if (panelMessageId) {
+        tempDoc.panelMessageId = panelMessageId;
+        await tempDoc.save().catch(() => {});
+      }
 
       logger.info(`Created temporary voice channel "${channelName}" for ${member.user.tag} with control panel`);
     } catch (err) {

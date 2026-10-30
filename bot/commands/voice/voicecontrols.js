@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 const TempVoice = require('../../../models/TempVoice');
 const Guild = require('../../../models/Guild');
+const guildService = require('../../../shared/guildService');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
@@ -71,6 +72,19 @@ module.exports = {
         const format = interaction.options.getString('format') || "🔊 {username}'s Lounge";
         const guild = interaction.guild;
 
+        // Clean up previous empty Join-to-Create setup if any exists to avoid duplicate categories
+        const existingSettings = await guildService.getSettings(guild.id);
+        if (existingSettings?.joinToCreate?.categoryId) {
+          const oldCat = guild.channels.cache.get(existingSettings.joinToCreate.categoryId);
+          if (oldCat) {
+            const oldChildren = guild.channels.cache.filter(c => c.parentId === oldCat.id);
+            for (const ch of oldChildren.values()) {
+              if (ch.members.size === 0) await ch.delete().catch(() => {});
+            }
+            if (oldCat.children?.cache?.size === 0) await oldCat.delete().catch(() => {});
+          }
+        }
+
         const category = await guild.channels.create({
           name: '🔊 VOICE LOUNGES',
           type: ChannelType.GuildCategory
@@ -83,26 +97,26 @@ module.exports = {
           userLimit: 1
         });
 
-        await Guild.updateOne(
-          { guildId: guild.id },
-          {
-            $set: {
-              'modules.join_to_create': true,
-              'joinToCreate.enabled': true,
-              'joinToCreate.channelId': trigger.id,
-              'joinToCreate.categoryId': category.id,
-              'joinToCreate.channelNameFormat': format
-            }
-          },
-          { upsert: true }
-        );
+        // Update settings in DB and immediately refresh the in-memory cache
+        await guildService.updateSettings(guild.id, {
+          'modules.join_to_create': true,
+          'joinToCreate.enabled': true,
+          'joinToCreate.channelId': trigger.id,
+          'joinToCreate.categoryId': category.id,
+          'joinToCreate.channelNameFormat': format
+        });
+
+        // Check if bot has MoveMembers permission
+        const botMember = await guild.members.fetchMe().catch(() => null);
+        const hasMoveMembers = botMember?.permissions.has(PermissionsBitField.Flags.MoveMembers);
+        const movePermNotice = hasMoveMembers ? '' : '\n\n⚠️ **Warning:** The bot role is missing the **Move Members** permission in server settings! Please enable **Move Members** for the bot role so it can automatically move members into their newly created rooms.';
 
         return interaction.followUp({
           embeds: [
             new EmbedBuilder()
               .setColor(COLORS.SUCCESS)
               .setTitle('🎉 Join-to-Create Voice Setup Complete!')
-              .setDescription(`Created category **${category.name}** and trigger channel <#${trigger.id}>.\nWhen members join <#${trigger.id}>, AURA will automatically create a private temporary voice lounge for them!`)
+              .setDescription(`Created category **${category.name}** and trigger channel <#${trigger.id}>.\nWhen members click <#${trigger.id}>, AURA will immediately create a private temporary voice room and move them into it!${movePermNotice}`)
           ]
         });
       } catch (err) {
@@ -223,6 +237,20 @@ module.exports = {
       }
 
       const guild = message.guild;
+
+      // Clean up previous empty Join-to-Create setup if any exists
+      const existingSettings = await guildService.getSettings(guild.id);
+      if (existingSettings?.joinToCreate?.categoryId) {
+        const oldCat = guild.channels.cache.get(existingSettings.joinToCreate.categoryId);
+        if (oldCat) {
+          const oldChildren = guild.channels.cache.filter(c => c.parentId === oldCat.id);
+          for (const ch of oldChildren.values()) {
+            if (ch.members.size === 0) await ch.delete().catch(() => {});
+          }
+          if (oldCat.children?.cache?.size === 0) await oldCat.delete().catch(() => {});
+        }
+      }
+
       const category = await guild.channels.create({
         name: '🔊 VOICE LOUNGES',
         type: ChannelType.GuildCategory
@@ -235,21 +263,21 @@ module.exports = {
         userLimit: 1
       });
 
-      await Guild.updateOne(
-        { guildId: guild.id },
-        {
-          $set: {
-            'modules.join_to_create': true,
-            'joinToCreate.enabled': true,
-            'joinToCreate.channelId': trigger.id,
-            'joinToCreate.categoryId': category.id,
-            'joinToCreate.channelNameFormat': "🔊 {username}'s Lounge"
-          }
-        },
-        { upsert: true }
-      );
+      // Update settings in DB and immediately refresh the in-memory cache
+      await guildService.updateSettings(guild.id, {
+        'modules.join_to_create': true,
+        'joinToCreate.enabled': true,
+        'joinToCreate.channelId': trigger.id,
+        'joinToCreate.categoryId': category.id,
+        'joinToCreate.channelNameFormat': "🔊 {username}'s Lounge"
+      });
 
-      return message.reply(`🎉 Join-to-Create Voice setup complete! Category: **${category.name}**, Trigger: <#${trigger.id}>.`);
+      // Check if bot has MoveMembers permission
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      const hasMoveMembers = botMember?.permissions.has(PermissionsBitField.Flags.MoveMembers);
+      const movePermNotice = hasMoveMembers ? '' : '\n\n⚠️ **Warning:** The bot role is missing the **Move Members** permission in server settings! Please enable **Move Members** for the bot role so it can automatically move members into their newly created rooms.';
+
+      return message.reply(`🎉 Join-to-Create Voice setup complete! Category: **${category.name}**, Trigger: <#${trigger.id}>.${movePermNotice}`);
     }
 
     const voiceChannel = message.member?.voice?.channel;
