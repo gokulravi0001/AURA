@@ -75,6 +75,13 @@ module.exports = {
       else if (interaction.isButton()) {
         const customId = interaction.customId;
 
+        // Temp Voice controls: vc_lock, vc_unlock, vc_hide, vc_show, vc_rename, vc_limit, vc_claim, vc_delete
+        if (customId.startsWith('vc_')) {
+          const voiceManager = require('../../modules/voiceManager');
+          await voiceManager.handleButton(interaction, client);
+          return;
+        }
+
         // Ticket interactions: ticket_create, ticket_claim, ticket_close, ticket_delete, ticket_reopen
         if (customId.startsWith('ticket_')) {
           const ticketHandler = require('../../modules/ticketManager');
@@ -106,6 +113,13 @@ module.exports = {
       // 3. Handle Modals
       else if (interaction.isModalSubmit()) {
         const customId = interaction.customId;
+
+        // Temp Voice modals: modal_vc_rename_, modal_vc_limit_
+        if (customId.startsWith('modal_vc_')) {
+          const voiceManager = require('../../modules/voiceManager');
+          await voiceManager.handleModal(interaction, client);
+          return;
+        }
 
         // Birthday registration modal
         if (customId === 'modal_birthday_register') {

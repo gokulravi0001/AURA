@@ -148,6 +148,27 @@ test('Features: Counting and Word Chain Services', () => {
   assert.strictEqual(typeof wordChainService.resetGame, 'function');
 });
 
+// 9. Temp Voice Control Panel Embed & Button Check
+test('Features: Temp Voice Manager & Interactive Control Panel', () => {
+  const voiceManager = require('../bot/modules/voiceManager');
+  assert.strictEqual(typeof voiceManager.buildControlPanel, 'function');
+  assert.strictEqual(typeof voiceManager.sendControlPanel, 'function');
+  assert.strictEqual(typeof voiceManager.handleButton, 'function');
+  assert.strictEqual(typeof voiceManager.handleModal, 'function');
+
+  const mockMember = {
+    id: 'user_123',
+    user: {
+      username: 'TestUser',
+      displayAvatarURL: () => 'https://example.com/avatar.png'
+    }
+  };
+
+  const panel = voiceManager.buildControlPanel({ id: 'chan_123', name: 'Test Lounge' }, mockMember);
+  assert.ok(panel.embeds && panel.embeds.length === 1);
+  assert.ok(panel.components && panel.components.length === 2);
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);

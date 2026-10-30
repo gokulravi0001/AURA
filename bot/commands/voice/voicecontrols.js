@@ -47,6 +47,10 @@ module.exports = {
       sub.setName('give')
         .setDescription('Transfer ownership of your channel to another member in the lounge')
         .addUserOption(opt => opt.setName('target').setDescription('Member to transfer ownership to').setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName('panel')
+        .setDescription('Send the interactive customization control panel into your voice channel')
     ),
   name: 'vc',
   description: 'Manage temporary voice channels or setup Join-to-Create',
@@ -122,6 +126,18 @@ module.exports = {
 
     if (!isOwner && !isAdmin) {
       return interaction.reply({ content: '🚫 Only the channel creator or an administrator can manage this voice lounge.', ephemeral: true });
+    }
+
+    // PANEL
+    if (sub === 'panel') {
+      const voiceManager = require('../../modules/voiceManager');
+      const panelData = voiceManager.buildControlPanel(voiceChannel, interaction.member);
+      await voiceChannel.send({
+        content: `👋 <@${interaction.user.id}>, here is your voice channel control panel:`,
+        embeds: panelData.embeds,
+        components: panelData.components
+      });
+      return interaction.reply({ content: '✅ Voice control panel posted in your channel!', ephemeral: true });
     }
 
     // LOCK
@@ -250,7 +266,16 @@ module.exports = {
       return message.reply('🚫 Only the channel creator or an administrator can manage this voice lounge.');
     }
 
-    if (action === 'lock') {
+    if (action === 'panel') {
+      const voiceManager = require('../../modules/voiceManager');
+      const panelData = voiceManager.buildControlPanel(voiceChannel, message.member);
+      await voiceChannel.send({
+        content: `👋 <@${message.author.id}>, here is your voice channel control panel:`,
+        embeds: panelData.embeds,
+        components: panelData.components
+      });
+      return message.reply('✅ Voice control panel posted in your channel!');
+    } else if (action === 'lock') {
       await voiceChannel.permissionOverwrites.edit(message.guild.roles.everyone, { Connect: false });
       return message.reply('🔒 Voice channel locked.');
     } else if (action === 'unlock') {
@@ -279,7 +304,7 @@ module.exports = {
       await tempDoc.save();
       return message.reply(`👑 Transferred ownership to <@${targetUser.id}>.`);
     } else {
-      return message.reply('ℹ️ Quick commands: `+vc setup`, `+vc lock`, `+vc unlock`, `+vc hide`, `+vc show`, `+vc limit <n>`, `+vc name <name>`, `+vc give @member`.');
+      return message.reply('ℹ️ Quick commands: `+vc setup`, `+vc panel`, `+vc lock`, `+vc unlock`, `+vc hide`, `+vc show`, `+vc limit <n>`, `+vc name <name>`, `+vc give @member`.');
     }
   }
 };
