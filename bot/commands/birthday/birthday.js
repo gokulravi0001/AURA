@@ -19,8 +19,10 @@ module.exports = {
     .setDescription('Register, view, list, or configure birthdays')
     .addSubcommand(sub =>
       sub.setName('set')
-        .setDescription('Set your birthday (e.g., DD/MM/YYYY or DD/MM)')
-        .addStringOption(opt => opt.setName('date').setDescription('Your birthday date (e.g. 24/10 or 15/05/2000)'))
+        .setDescription('Save your birthday or another member\'s birthday with country/timezone')
+        .addStringOption(opt => opt.setName('date').setDescription('Birthday date (e.g. 24/10 or 15/05/2000)').setRequired(true))
+        .addUserOption(opt => opt.setName('user').setDescription('Target member to save birthday for (leave empty for yourself)'))
+        .addStringOption(opt => opt.setName('timezone').setDescription('Country or Timezone (e.g. India, USA, UK, IST, EST, UTC+5:30)'))
     )
     .addSubcommand(sub =>
       sub.setName('view')
@@ -62,6 +64,11 @@ module.exports = {
     // 1. SET
     if (sub === 'set') {
       const dateOption = interaction.options.getString('date');
+      const targetUser = interaction.options.getUser('user') || interaction.user;
+      const isForOther = targetUser.id !== interaction.user.id;
+      const tzOption = interaction.options.getString('timezone');
+      const timezone = birthdayService.resolveTimezone(tzOption);
+
       if (dateOption) {
         const parsed = birthdayService.parseDate(dateOption);
         if (!parsed) {
@@ -72,23 +79,36 @@ module.exports = {
         }
 
         await Birthday.findOneAndUpdate(
-          { guildId: interaction.guild.id, userId: interaction.user.id },
-          { day: parsed.day, month: parsed.month, year: parsed.year, lastWishedYear: 0 },
+          { guildId: interaction.guild.id, userId: targetUser.id },
+          {
+            day: parsed.day,
+            month: parsed.month,
+            year: parsed.year,
+            timezone,
+            setBy: interaction.user.id,
+            lastWishedYear: 0
+          },
           { upsert: true }
         );
 
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const formatted = `${parsed.day} ${months[parsed.month - 1]}${parsed.year ? ` ${parsed.year}` : ''}`;
+        const tzDisplay = birthdayService.formatTimezoneDisplay(timezone);
 
         // Also attempt to send DM confirmation
-        sendBirthdayConfirmationDM(interaction.user, interaction.guild, formatted);
+        sendBirthdayConfirmationDM(targetUser, interaction.guild, formatted, timezone, interaction.user);
 
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
               .setColor(COLORS.SUCCESS)
-              .setTitle('🎂 Birthday Saved!')
-              .setDescription(`Your birthday is set to **${formatted}**!\n🔒 *Your date was saved privately.*`)
+              .setTitle(isForOther ? `🎂 Birthday Saved for ${targetUser.username}!` : '🎂 Birthday Saved!')
+              .setDescription(
+                `${isForOther ? `Saved <@${targetUser.id}>'s birthday` : 'Your birthday is set'} to **${formatted}**!\n` +
+                `🌍 **Timezone:** ${tzDisplay}\n` +
+                `⏰ AURA will celebrate their birthday at **12:00 AM midnight** in their country!\n` +
+                `🔒 *Saved privately.*`
+              )
           ],
           ephemeral: true
         });
@@ -97,17 +117,28 @@ module.exports = {
       // Open interactive modal
       const modal = new ModalBuilder()
         .setCustomId('modal_birthday_register')
-        .setTitle('Register Your Birthday');
+        .setTitle('Register Birthday');
 
       const dateInput = new TextInputBuilder()
         .setCustomId('birthday_input')
-        .setLabel('Your Birthday (DD/MM/YYYY or DD/MM)')
+        .setLabel('Birthday Date (DD/MM/YYYY or DD/MM)')
         .setPlaceholder('e.g. 24/10 or 15/05/2000')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setMaxLength(10);
 
-      modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
+      const tzInput = new TextInputBuilder()
+        .setCustomId('timezone_input')
+        .setLabel('Country or Timezone (Optional)')
+        .setPlaceholder('e.g. India, USA, UK, IST, EST')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(30);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(dateInput),
+        new ActionRowBuilder().addComponents(tzInput)
+      );
       return await interaction.showModal(modal);
     }
 
@@ -322,81 +353,133 @@ module.exports = {
       );
     }
 
-    // User provides birthday date directly: e.g. +bday 24/10 or +bday 24/10/2005
-    const dateStr = args.join(' ');
-    const parsed = birthdayService.parseDate(dateStr);
+    // User provides birthday date directly or with set: e.g. +bday 24/10 or +bday set 24/10/2005 @friend India
+    let effectiveArgs = action === 'set' ? args.slice(1) : args;
+    const targetUser = message.mentions.users.first() || message.author;
+    const isForOther = targetUser.id !== message.author.id;
+
+    // Filter out user mention tokens to extract date and timezone
+    const textWithoutMentions = effectiveArgs.filter(a => !a.startsWith('<@') && !a.startsWith('@')).join(' ').trim();
+    const parsed = birthdayService.parseDate(textWithoutMentions);
 
     if (!parsed) {
-      return message.reply('ℹ️ Usage: `+bday <DD/MM>` or `+bday <DD/MM/YYYY>`\n*Subcommands: `+bday view`, `+bday list`, `+bday remove`*');
+      return message.reply('ℹ️ Usage:\n• `+bday <DD/MM/YYYY> [@user] [Country/Timezone]`\n• `+bday set <DD/MM/YYYY> [@user] [Country/Timezone]`\n• `+bday view [@user]`, `+bday list`, `+bday remove`\n*Example:* `+bday 24/10/2005 @friend India` or `+bday 15/05 USA`');
     }
+
+    // Extract timezone from remaining text after removing date
+    const dateSubstringMatch = textWithoutMentions.match(/(\d{1,2}\s*[-/.]\s*\d{1,2}(?:\s*[-/.]\s*\d{2,4})?)/);
+    let remainingTzText = textWithoutMentions;
+    if (dateSubstringMatch) {
+      remainingTzText = textWithoutMentions.replace(dateSubstringMatch[0], '').trim();
+    }
+    const timezone = birthdayService.resolveTimezone(remainingTzText);
 
     // 1. DELETE USER'S MESSAGE IMMEDIATELY (Privacy Protection)
     await message.delete().catch(() => {});
 
     // 2. SAVE IN MONGODB
     await Birthday.findOneAndUpdate(
-      { guildId: message.guild.id, userId: message.author.id },
-      { day: parsed.day, month: parsed.month, year: parsed.year, lastWishedYear: 0 },
+      { guildId: message.guild.id, userId: targetUser.id },
+      {
+        day: parsed.day,
+        month: parsed.month,
+        year: parsed.year,
+        timezone,
+        setBy: message.author.id,
+        lastWishedYear: 0
+      },
       { upsert: true }
     );
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const formatted = `${parsed.day} ${months[parsed.month - 1]}${parsed.year ? ` ${parsed.year}` : ''}`;
+    const tzDisplay = birthdayService.formatTimezoneDisplay(timezone);
 
-    // 3. SEND DIRECT MESSAGE TO MEMBER
-    await sendBirthdayConfirmationDM(message.author, message.guild, formatted, message.channel);
+    // 3. SEND DIRECT MESSAGE TO TARGET AND AUTHOR
+    await sendBirthdayConfirmationDM(targetUser, message.guild, formatted, timezone, message.author, message.channel);
+
+    // Optional temporary notice in channel
+    const notice = await message.channel.send(
+      `🎂 ${isForOther ? `Saved birthday for <@${targetUser.id}>` : `<@${message.author.id}>, your birthday was saved`} as **${formatted}**!\n🌍 **Timezone:** ${tzDisplay}\n⏰ *AURA will celebrate them right at 12:00 AM midnight in their country!* *(Message auto-deleted for privacy)*`
+    ).catch(() => null);
+    if (notice) setTimeout(() => notice.delete().catch(() => {}), 8000);
   }
 };
 
-async function sendBirthdayConfirmationDM(user, guild, formattedDate, channel = null) {
+async function sendBirthdayConfirmationDM(user, guild, formattedDate, timezone = 'Asia/Kolkata', author = null, channel = null) {
+  const isForOther = author && author.id !== user.id;
+
   const dmEmbed = new EmbedBuilder()
     .setColor(COLORS.SUCCESS)
     .setTitle('🎂 Birthday Successfully Saved!')
-    .setDescription(`Hello **${user.username}**, your birthday has been saved for **${guild.name}**!\n\n📅 **Date:** \`${formattedDate}\`\n\n🔒 **Privacy:** *We automatically deleted your message in the server to protect your personal information. When your special day arrives, we will celebrate with you!* 🎉`)
+    .setDescription(
+      isForOther
+        ? `Hello **${user.username}**! <@${author.id}> has registered your birthday in **${guild.name}**!\n\n📅 **Date:** \`${formattedDate}\`\n🌍 **Country/Timezone:** \`${timezone}\`\n\n🎉 *When your special day arrives, AURA will celebrate with you at 12:00 AM midnight in your timezone!*`
+        : `Hello **${user.username}**, your birthday has been saved for **${guild.name}**!\n\n📅 **Date:** \`${formattedDate}\`\n🌍 **Country/Timezone:** \`${timezone}\`\n\n🔒 **Privacy:** *We automatically deleted your message in the server to protect your personal information. When your special day arrives, we will celebrate with you right at 12:00 AM midnight!* 🎉`
+    )
     .setFooter({ text: guild.name, iconURL: guild.iconURL({ dynamic: true }) })
     .setTimestamp();
 
   try {
     await user.send({ embeds: [dmEmbed] });
   } catch (err) {
-    // If user's DMs are disabled, send a self-deleting message in the channel
-    if (channel) {
-      const notice = await channel.send(`🎂 <@${user.id}>, your birthday was saved! *(Deleted your message to protect your privacy)*`);
-      setTimeout(() => notice.delete().catch(() => {}), 6000);
-    }
+    // Non-critical if user's DMs are closed
+  }
+
+  // If saved for another member, also DM the author confirming it
+  if (isForOther && author) {
+    const authorEmbed = new EmbedBuilder()
+      .setColor(COLORS.SUCCESS)
+      .setTitle('🎂 Friend\'s Birthday Saved!')
+      .setDescription(`You successfully saved **${user.username}**'s birthday in **${guild.name}**!\n\n📅 **Date:** \`${formattedDate}\`\n🌍 **Timezone:** \`${timezone}\`\n⏰ *AURA will wish them right at 12:00 AM midnight in their local time!*`)
+      .setFooter({ text: guild.name })
+      .setTimestamp();
+    try {
+      await author.send({ embeds: [authorEmbed] });
+    } catch (_) {}
   }
 }
 
 function buildBirthdayCard(user, bday) {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const now = new Date();
-  const currentYear = now.getUTCFullYear();
+  const tz = bday.timezone || 'Asia/Kolkata';
+  const local = birthdayService.getUserLocalTime(tz);
 
-  let nextBday = new Date(Date.UTC(currentYear, bday.month - 1, bday.day));
-  if (nextBday < now && (now.getUTCDate() !== bday.day || now.getUTCMonth() !== (bday.month - 1))) {
-    nextBday = new Date(Date.UTC(currentYear + 1, bday.month - 1, bday.day));
+  let nextYear = local.year;
+  if (local.month > bday.month || (local.month === bday.month && local.day > bday.day)) {
+    nextYear += 1;
   }
 
-  const diffMs = nextBday.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const isToday = diffDays === 0 || (now.getUTCDate() === bday.day && now.getUTCMonth() === (bday.month - 1));
+  // Calculate days left using user's local timezone
+  const now = new Date();
+  const nextBdayUtc = new Date(Date.UTC(nextYear, bday.month - 1, bday.day));
+  const diffMs = nextBdayUtc.getTime() - now.getTime();
+  const diffDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  const isToday = local.month === bday.month && local.day === bday.day;
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
     .setAuthor({ name: `${user.username}'s Birthday`, iconURL: user.displayAvatarURL({ dynamic: true }) })
     .setThumbnail(user.displayAvatarURL({ dynamic: true }))
     .addFields(
       { name: '📅 Date', value: `**${bday.day} ${months[bday.month - 1]}**${bday.year ? ` (${bday.year})` : ''}`, inline: true },
-      { name: '⏳ Countdown', value: isToday ? '🎉 **IT IS TODAY! HAPPY BIRTHDAY!**' : `**${diffDays} days left**`, inline: true }
+      { name: '⏳ Countdown', value: isToday ? '🎉 **IT IS TODAY! HAPPY BIRTHDAY!**' : `**${diffDays} days left**`, inline: true },
+      { name: '🌍 Timezone / Country', value: birthdayService.formatTimezoneDisplay(tz), inline: false }
     )
-    .setFooter({ text: 'AURA Birthday System' })
+    .setFooter({ text: 'AURA Birthday System • Wishes at 12:00 AM local time' })
     .setTimestamp();
+
+  if (bday.setBy && bday.setBy !== user.id) {
+    embed.addFields({ name: '👤 Registered By', value: `<@${bday.setBy}>`, inline: true });
+  }
+
+  return embed;
 }
 
 async function getUpcomingBirthdaysEmbed(guild) {
   const birthdays = await Birthday.find({ guildId: guild.id })
     .sort({ month: 1, day: 1 })
-    .limit(15);
+    .limit(20);
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -409,12 +492,13 @@ async function getUpcomingBirthdaysEmbed(guild) {
 
   let list = '';
   for (const b of birthdays) {
-    list += `🎉 **${b.day} ${months[b.month - 1]}** — <@${b.userId}>\n`;
+    const tz = b.timezone || 'Asia/Kolkata';
+    list += `🎉 **${b.day} ${months[b.month - 1]}** — <@${b.userId}> • \`${tz}\`\n`;
   }
 
   return new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
     .setTitle(`🎂 Upcoming Birthdays in ${guild.name}`)
     .setDescription(list)
-    .setFooter({ text: 'Register with /bday set or view with /bday view' });
+    .setFooter({ text: 'Register with /bday set [user] [timezone] • Wishes at 12:00 AM' });
 }

@@ -172,15 +172,35 @@ module.exports = {
 
       const birthdayService = require('../../modules/birthdayService');
       const Birthday = require('../../../models/Birthday');
-      const parsed = birthdayService.parseDate(message.content);
+
+      // Check if a member was mentioned (e.g. 24/10 @friend India)
+      const targetUser = message.mentions.users.first() || message.author;
+      const isForOther = targetUser.id !== message.author.id;
+      const cleanContent = message.content.replace(/<@!?\d+>/g, '').trim();
+      const parsed = birthdayService.parseDate(cleanContent);
 
       // Always delete message from birthday set channel immediately to protect user privacy
       await message.delete().catch(() => {});
 
       if (parsed) {
+        // Extract timezone from remaining text
+        const dateSubMatch = cleanContent.match(/(\d{1,2}\s*[-/.]\s*\d{1,2}(?:\s*[-/.]\s*\d{2,4})?)/);
+        let remainingTzText = cleanContent;
+        if (dateSubMatch) {
+          remainingTzText = cleanContent.replace(dateSubMatch[0], '').trim();
+        }
+        const timezone = birthdayService.resolveTimezone(remainingTzText);
+
         await Birthday.findOneAndUpdate(
-          { guildId: message.guild.id, userId: message.author.id },
-          { day: parsed.day, month: parsed.month, year: parsed.year, lastWishedYear: 0 },
+          { guildId: message.guild.id, userId: targetUser.id },
+          {
+            day: parsed.day,
+            month: parsed.month,
+            year: parsed.year,
+            timezone,
+            setBy: message.author.id,
+            lastWishedYear: 0
+          },
           { upsert: true }
         );
 
@@ -194,21 +214,37 @@ module.exports = {
           .setColor(COLORS.SUCCESS)
           .setTitle('🎂 Birthday Successfully Saved!')
           .setDescription(
-            `Hello **${message.author.username}**, your birthday has been saved for **${message.guild.name}**!\n\n` +
-            `📅 **Date:** \`${formatted}\`\n\n` +
-            `🔒 **Privacy:** *We automatically deleted your message in <#${message.channel.id}> so your birthdate stays completely private.*\n\n` +
-            `🎉 *When your special day arrives, we will celebrate with you in ${wishChannelNotice}!*`
+            isForOther
+              ? `Hello **${targetUser.username}**! <@${message.author.id}> has saved your birthday for **${message.guild.name}**!\n\n` +
+                `📅 **Date:** \`${formatted}\`\n` +
+                `🌍 **Timezone:** \`${timezone}\`\n\n` +
+                `🎉 *When your special day arrives, we will celebrate with you at 12:00 AM midnight in ${wishChannelNotice}!*`
+              : `Hello **${message.author.username}**, your birthday has been saved for **${message.guild.name}**!\n\n` +
+                `📅 **Date:** \`${formatted}\`\n` +
+                `🌍 **Timezone:** \`${timezone}\`\n\n` +
+                `🔒 **Privacy:** *We automatically deleted your message in <#${message.channel.id}> so your birthdate stays completely private.*\n\n` +
+                `🎉 *When your special day arrives, we will celebrate with you at 12:00 AM midnight in ${wishChannelNotice}!*`
           )
           .setFooter({ text: message.guild.name, iconURL: message.guild.iconURL({ dynamic: true }) })
           .setTimestamp();
 
         try {
-          await message.author.send({ embeds: [dmEmbed] });
+          await targetUser.send({ embeds: [dmEmbed] });
         } catch (err) {
-          const tempMsg = await message.channel.send(
-            `🎂 <@${message.author.id}>, your birthday was saved as **${formatted}**!\n*(Deleted your message for privacy. Enable DMs from server members to receive private confirmations!)*`
-          );
-          setTimeout(() => tempMsg.delete().catch(() => {}), 6000);
+          // Non-critical
+        }
+
+        // If saved for a friend, confirm to the author too
+        if (isForOther) {
+          const authorConfirm = new EmbedBuilder()
+            .setColor(COLORS.SUCCESS)
+            .setTitle('🎂 Friend\'s Birthday Saved!')
+            .setDescription(`Saved **${targetUser.username}**'s birthday in **${message.guild.name}**!\n📅 **Date:** \`${formatted}\`\n🌍 **Timezone:** \`${timezone}\`\n⏰ *Wishes at 12:00 AM midnight in their timezone!*`)
+            .setFooter({ text: message.guild.name })
+            .setTimestamp();
+          try {
+            await message.author.send({ embeds: [authorConfirm] });
+          } catch (_) {}
         }
         return;
       } else if (isBdaySetChannel) {

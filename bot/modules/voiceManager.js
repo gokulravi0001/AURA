@@ -145,8 +145,11 @@ const voiceManager = {
     if (!guild || !member) return;
 
     try {
-      // Validate parent category exists
-      let parentCategory = settings.joinToCreate?.categoryId || voiceState.channel?.parentId;
+      // Get the exact trigger channel the user joined
+      const triggerChannel = voiceState.channel || guild.channels.cache.get(voiceState.channelId) || await guild.channels.fetch(voiceState.channelId).catch(() => null);
+
+      // Parent category MUST be the exact category where the trigger channel is located
+      let parentCategory = triggerChannel?.parentId || settings.joinToCreate?.categoryId;
       if (parentCategory) {
         const cat = guild.channels.cache.get(parentCategory) || await guild.channels.fetch(parentCategory).catch(() => null);
         if (!cat) parentCategory = null;
@@ -159,11 +162,12 @@ const voiceManager = {
 
       const botId = guild.members.me?.id || voiceState.client?.user?.id;
 
-      // Create private/custom channel with permissions allowing member and bot to talk/read
+      // Create private/custom channel directly below the trigger channel in the SAME category
       const newChannel = await guild.channels.create({
         name: channelName,
         type: ChannelType.GuildVoice,
         parent: parentCategory || undefined,
+        position: triggerChannel ? triggerChannel.position + 1 : undefined,
         userLimit: settings.joinToCreate?.userLimit || 0,
         bitrate: settings.joinToCreate?.bitrate || 64000,
         permissionOverwrites: [

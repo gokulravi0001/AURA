@@ -5,7 +5,134 @@ const logger = require('../../shared/logger');
 const { COLORS } = require('../../shared/constants');
 const { EmbedBuilder } = require('discord.js');
 
+const COMMON_TIMEZONES = {
+  india: 'Asia/Kolkata', ind: 'Asia/Kolkata', ist: 'Asia/Kolkata',
+  usa: 'America/New_York', us: 'America/New_York', est: 'America/New_York', edt: 'America/New_York',
+  cst: 'America/Chicago', cdt: 'America/Chicago', mst: 'America/Denver', mdt: 'America/Denver',
+  pst: 'America/Los_Angeles', pdt: 'America/Los_Angeles',
+  uk: 'Europe/London', england: 'Europe/London', london: 'Europe/London', gmt: 'UTC', utc: 'UTC', bst: 'Europe/London',
+  canada: 'America/Toronto', toronto: 'America/Toronto', vancouver: 'America/Vancouver',
+  dubai: 'Asia/Dubai', uae: 'Asia/Dubai',
+  singapore: 'Asia/Singapore', sgt: 'Asia/Singapore',
+  malaysia: 'Asia/Kuala_Lumpur', myt: 'Asia/Kuala_Lumpur',
+  japan: 'Asia/Tokyo', tokyo: 'Asia/Tokyo', jst: 'Asia/Tokyo',
+  korea: 'Asia/Seoul', seoul: 'Asia/Seoul', kst: 'Asia/Seoul',
+  australia: 'Australia/Sydney', sydney: 'Australia/Sydney', aest: 'Australia/Sydney',
+  germany: 'Europe/Berlin', berlin: 'Europe/Berlin', cet: 'Europe/Berlin',
+  france: 'Europe/Paris', paris: 'Europe/Paris',
+  italy: 'Europe/Rome', rome: 'Europe/Rome',
+  spain: 'Europe/Madrid', madrid: 'Europe/Madrid',
+  pakistan: 'Asia/Karachi', karachi: 'Asia/Karachi', pkt: 'Asia/Karachi',
+  srilanka: 'Asia/Colombo', colombo: 'Asia/Colombo',
+  bangladesh: 'Asia/Dhaka', dhaka: 'Asia/Dhaka', bdt: 'Asia/Dhaka',
+  nepal: 'Asia/Kathmandu', kathmandu: 'Asia/Kathmandu', npt: 'Asia/Kathmandu',
+  philippines: 'Asia/Manila', manila: 'Asia/Manila', pht: 'Asia/Manila',
+  russia: 'Europe/Moscow', moscow: 'Europe/Moscow',
+  brazil: 'America/Sao_Paulo', 'saopaulo': 'America/Sao_Paulo',
+  mexico: 'America/Mexico_City',
+  nz: 'Pacific/Auckland', newzealand: 'Pacific/Auckland', auckland: 'Pacific/Auckland',
+  saudi: 'Asia/Riyadh', riyadh: 'Asia/Riyadh'
+};
+
 const birthdayService = {
+  /**
+   * Resolve user country / city / abbreviation to valid IANA timezone
+   */
+  resolveTimezone(input) {
+    if (!input || typeof input !== 'string') return 'Asia/Kolkata';
+    const raw = input.trim().toLowerCase();
+    if (COMMON_TIMEZONES[raw]) return COMMON_TIMEZONES[raw];
+    const noSpace = raw.replace(/[\s_-]+/g, '');
+    if (COMMON_TIMEZONES[noSpace]) return COMMON_TIMEZONES[noSpace];
+
+    // Check UTC / GMT offset e.g. +5:30, -5, UTC+5:30
+    const offsetMatch = raw.match(/^(?:utc|gmt)?\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?$/);
+    if (offsetMatch) {
+      const sign = offsetMatch[1];
+      const hrs = parseInt(offsetMatch[2], 10);
+      const mins = offsetMatch[3] ? parseInt(offsetMatch[3], 10) : 0;
+      if (sign === '+' && hrs === 5 && mins === 30) return 'Asia/Kolkata';
+      if (sign === '+' && hrs === 5 && mins === 45) return 'Asia/Kathmandu';
+      if (sign === '+' && hrs === 3 && mins === 30) return 'Asia/Tehran';
+
+      const offsetMap = {
+        '-10': 'Pacific/Honolulu', '-9': 'America/Anchorage', '-8': 'America/Los_Angeles',
+        '-7': 'America/Denver', '-6': 'America/Chicago', '-5': 'America/New_York',
+        '-4': 'America/Halifax', '-3': 'America/Sao_Paulo', '-2': 'America/Noronha',
+        '-1': 'Atlantic/Cape_Verde', '+0': 'UTC', '+1': 'Europe/Paris',
+        '+2': 'Europe/Athens', '+3': 'Europe/Moscow', '+4': 'Asia/Dubai',
+        '+5': 'Asia/Karachi', '+6': 'Asia/Dhaka', '+7': 'Asia/Bangkok',
+        '+8': 'Asia/Singapore', '+9': 'Asia/Tokyo', '+10': 'Australia/Sydney',
+        '+11': 'Pacific/Guadalcanal', '+12': 'Pacific/Auckland'
+      };
+      const key = sign + hrs;
+      if (offsetMap[key]) return offsetMap[key];
+    }
+
+    // Try direct IANA name
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: input.trim() });
+      return input.trim();
+    } catch (e) {}
+
+    return 'Asia/Kolkata';
+  },
+
+  /**
+   * Get user local date and time according to their country/timezone
+   */
+  getUserLocalTime(timeZone) {
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(new Date());
+      const res = {};
+      for (const p of parts) res[p.type] = p.value;
+      return {
+        year: parseInt(res.year, 10),
+        month: parseInt(res.month, 10),
+        day: parseInt(res.day, 10),
+        hour: parseInt(res.hour === '24' ? '0' : res.hour, 10),
+        minute: parseInt(res.minute, 10)
+      };
+    } catch (e) {
+      const d = new Date();
+      return {
+        year: d.getUTCFullYear(),
+        month: d.getUTCMonth() + 1,
+        day: d.getUTCDate(),
+        hour: d.getUTCHours(),
+        minute: d.getUTCMinutes()
+      };
+    }
+  },
+
+  /**
+   * Format timezone for user display
+   */
+  formatTimezoneDisplay(timeZone) {
+    const tz = timeZone || 'Asia/Kolkata';
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        timeZoneName: 'short',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true
+      });
+      const formattedTime = formatter.format(new Date());
+      return `\`${tz}\` (Local: ${formattedTime})`;
+    } catch (e) {
+      return `\`${tz}\``;
+    }
+  },
   /**
    * Parse user entered date string
    * Supported: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, YYYY-MM-DD, DD/MM, Month Day
@@ -155,25 +282,24 @@ const birthdayService = {
   },
 
   /**
-   * Initialize cron job to check birthdays every hour
+   * Initialize cron job to check birthdays every 10 minutes
    */
   init(client) {
-    // Run at minute 0 of every hour
-    cron.schedule('0 * * * *', async () => {
+    // Run every 10 minutes to accurately catch 12:00 AM midnight across all world timezones
+    cron.schedule('*/10 * * * *', async () => {
       await this.checkBirthdays(client);
     });
+    // Initial check on bot ready
+    setTimeout(() => {
+      this.checkBirthdays(client).catch(() => {});
+    }, 5000);
   },
 
   /**
-   * Check birthdays for all active guilds
+   * Check birthdays for all active guilds respecting each user's local timezone
    */
   async checkBirthdays(client) {
     try {
-      const now = new Date();
-      const currentYear = now.getUTCFullYear();
-      const currentMonth = now.getUTCMonth() + 1;
-      const currentDay = now.getUTCDate();
-
       // Find guilds with birthdays module enabled
       const guilds = await Guild.find({
         'modules.birthdays': { $ne: false },
@@ -188,51 +314,53 @@ const birthdayService = {
         const channel = announcementChannelId ? guild.channels.cache.get(announcementChannelId) : null;
         if (!channel || !channel.isTextBased()) continue;
 
-        // Query birthdays for today
-        const birthdaysToday = await Birthday.find({
-          guildId: guild.id,
-          month: currentMonth,
-          day: currentDay,
-          lastWishedYear: { $ne: currentYear }
-        });
+        // Fetch all registered birthdays for this guild
+        const allGuildBirthdays = await Birthday.find({ guildId: guild.id });
 
-        for (const bday of birthdaysToday) {
+        for (const bday of allGuildBirthdays) {
           try {
-            const member = await guild.members.fetch(bday.userId).catch(() => null);
-            if (!member) continue;
+            const tz = bday.timezone || 'Asia/Kolkata';
+            const local = this.getUserLocalTime(tz);
 
-            // Optional age calculation
-            let ageStr = '';
-            if (bday.year) {
-              const age = currentYear - bday.year;
-              ageStr = ` on turning **${age}**`;
-            }
+            // Check if today is the user's birthday in their local country/timezone and not wished yet this year
+            if (local.month === bday.month && local.day === bday.day && bday.lastWishedYear !== local.year) {
+              const member = await guild.members.fetch(bday.userId).catch(() => null);
+              if (!member) continue;
 
-            const rawMsg = guildConfig.birthdays.message || '🎂 Happy Birthday {user}! Wishing you an awesome day! 🎉';
-            const formattedMsg = rawMsg
-              .replace(/{user}/g, `<@${member.id}>`)
-              .replace(/{username}/g, member.user.username);
-
-            const embed = new EmbedBuilder()
-              .setColor(COLORS.PRIMARY)
-              .setTitle('🎉 Happy Birthday! 🎂')
-              .setDescription(`${formattedMsg}${ageStr}`)
-              .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-              .setFooter({ text: 'Celebrate with them today!' })
-              .setTimestamp();
-
-            await channel.send({ content: `<@${member.id}>`, embeds: [embed] });
-
-            // Assign birthday role if configured
-            if (guildConfig.birthdays.roleId) {
-              const role = guild.roles.cache.get(guildConfig.birthdays.roleId);
-              if (role && guild.members.me?.permissions.has('ManageRoles')) {
-                await member.roles.add(role).catch(() => {});
+              // Optional age calculation
+              let ageStr = '';
+              if (bday.year) {
+                const age = local.year - bday.year;
+                ageStr = ` on turning **${age}**`;
               }
-            }
 
-            bday.lastWishedYear = currentYear;
-            await bday.save();
+              const rawMsg = guildConfig.birthdays.message || '🎂 Happy Birthday {user}! Wishing you an awesome day! 🎉';
+              const formattedMsg = rawMsg
+                .replace(/{user}/g, `<@${member.id}>`)
+                .replace(/{username}/g, member.user.username);
+
+              const embed = new EmbedBuilder()
+                .setColor(COLORS.PRIMARY)
+                .setTitle('🎉 Happy Birthday! 🎂')
+                .setDescription(`${formattedMsg}${ageStr}\n\n🌍 *Celebrated right at 12:00 AM (${tz})*`)
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .setFooter({ text: 'Celebrate with them today!' })
+                .setTimestamp();
+
+              await channel.send({ content: `<@${member.id}>`, embeds: [embed] });
+
+              // Assign birthday role if configured
+              if (guildConfig.birthdays.roleId) {
+                const role = guild.roles.cache.get(guildConfig.birthdays.roleId);
+                if (role && guild.members.me?.permissions.has('ManageRoles')) {
+                  await member.roles.add(role).catch(() => {});
+                }
+              }
+
+              bday.lastWishedYear = local.year;
+              await bday.save();
+              logger.info(`Celebrated birthday for ${member.user.tag} in ${guild.name} at 12:00 AM (${tz})`);
+            }
           } catch (err) {
             logger.error(`Error wishing birthday to ${bday.userId}:`, err.message);
           }

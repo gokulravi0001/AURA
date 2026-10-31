@@ -6,6 +6,8 @@ const BirthdaySchema = new mongoose.Schema({
   day: { type: Number, required: true },
   month: { type: Number, required: true }, // 1-12
   year: { type: Number, default: null }, // Optional
+  timezone: { type: String, default: 'Asia/Kolkata' }, // User's local timezone (e.g. Asia/Kolkata, America/New_York)
+  setBy: { type: String, default: null }, // ID of user who registered this birthday
   lastWishedYear: { type: Number, default: 0 }
 }, {
   timestamps: true

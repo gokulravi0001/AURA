@@ -184,6 +184,24 @@ test('Features: Modules Command & Panel Builder', () => {
   assert.ok(panel.components && panel.components.length === 2);
 });
 
+// 11. Birthday Multi-Country Timezone Resolution
+test('Features: Birthday Timezone Resolution & Local Time', () => {
+  assert.strictEqual(birthdayService.resolveTimezone('India'), 'Asia/Kolkata');
+  assert.strictEqual(birthdayService.resolveTimezone('IST'), 'Asia/Kolkata');
+  assert.strictEqual(birthdayService.resolveTimezone('+5:30'), 'Asia/Kolkata');
+  assert.strictEqual(birthdayService.resolveTimezone('USA'), 'America/New_York');
+  assert.strictEqual(birthdayService.resolveTimezone('UK'), 'Europe/London');
+  assert.strictEqual(birthdayService.resolveTimezone('Dubai'), 'Asia/Dubai');
+  assert.strictEqual(birthdayService.resolveTimezone('Japan'), 'Asia/Tokyo');
+
+  const local = birthdayService.getUserLocalTime('Asia/Kolkata');
+  assert.ok(local.year >= 2026);
+  assert.ok(local.month >= 1 && local.month <= 12);
+  assert.ok(local.day >= 1 && local.day <= 31);
+  assert.ok(local.hour >= 0 && local.hour <= 23);
+  assert.ok(local.minute >= 0 && local.minute <= 59);
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);
