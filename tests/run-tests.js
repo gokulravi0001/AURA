@@ -141,13 +141,44 @@ test('Features: Invite Tracker model & service', () => {
 });
 
 // 8. Minigames Handlers & Reaction Check
-test('Features: Counting and Word Chain Services', () => {
+test('Features: Counting and Word Chain Services', async () => {
   const countingService = require('../bot/modules/countingService');
   const wordChainService = require('../bot/modules/wordChainService');
 
   assert.strictEqual(typeof countingService.handleMessage, 'function');
   assert.strictEqual(typeof wordChainService.handleMessage, 'function');
   assert.strictEqual(typeof wordChainService.resetGame, 'function');
+
+  // Verify duplicate word caution handling
+  let reactedEmoji = null;
+  let sentMessage = null;
+  const mockMsg = {
+    content: 'apple',
+    author: { id: 'user_different', bot: false },
+    guild: { id: 'guild_123' },
+    react: async (emoji) => { reactedEmoji = emoji; },
+    channel: {
+      send: async (text) => { sentMessage = text; }
+    }
+  };
+
+  const mockSettings = {
+    wordChainGame: {
+      lastWord: 'zebra',
+      lastUserId: 'user_first',
+      usedWords: ['apple', 'zebra'],
+      currentStreak: 5,
+      highScore: 10
+    }
+  };
+
+  const handled = await wordChainService.handleMessage(mockMsg, mockSettings);
+  assert.strictEqual(handled, true);
+  assert.strictEqual(reactedEmoji, '⚠️');
+  assert.ok(sentMessage && sentMessage.includes("already typed"));
+  assert.ok(sentMessage && sentMessage.includes("hasn't been broken"));
+  // Streak preserved
+  assert.strictEqual(mockSettings.wordChainGame.currentStreak, 5);
 });
 
 // 9. Temp Voice Control Panel Embed & Button Check

@@ -45,17 +45,15 @@ const wordChainService = {
       }
     }
 
-    // 3. Check if word was already used
+    // 3. Check if word was already used in this chain (Allow, do not break streak, react with caution ⚠️)
     if (game.usedWords && game.usedWords.includes(raw)) {
-      await message.react('❌').catch(() => {});
-      await message.channel.send(`⚠️ **"${raw}"** has already been used in this chain! Streak broke at **${game.currentStreak}**.`);
-      await this.resetGame(message.guild.id);
-      if (settings.wordChainGame) {
-        settings.wordChainGame.lastWord = '';
-        settings.wordChainGame.lastUserId = null;
-        settings.wordChainGame.usedWords = [];
-        settings.wordChainGame.currentStreak = 0;
-      }
+      await message.react('⚠️').catch(() => {});
+      const requiredLetter = game.lastWord ? game.lastWord.slice(-1).toUpperCase() : '';
+      const hint = requiredLetter ? ` starting with **"${requiredLetter}"**` : '';
+      await message.channel.send(
+        `⚠️ <@${message.author.id}>, this word was already typed! But the chain hasn't been broken, so try another word${hint}! (Current Streak: **${game.currentStreak || 0}**)`
+      ).catch(() => {});
+      // Chain is preserved — do not reset the streak or game state!
       return true;
     }
 
