@@ -76,10 +76,33 @@ module.exports = {
             .setDescription('Voice channel to disconnect members from (defaults to your current voice channel)')
             .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
         )
+    )
+    .addSubcommand(sub =>
+      sub.setName('mute')
+        .setDescription('Mass server-mute all members in a voice channel')
+        .addChannelOption(opt =>
+          opt.setName('channel')
+            .setDescription('Voice channel to mute members in (defaults to your current voice channel)')
+            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName('unmute')
+        .setDescription('Mass server-unmute all members in a voice channel')
+        .addChannelOption(opt =>
+          opt.setName('channel')
+            .setDescription('Voice channel to unmute members in (defaults to your current voice channel)')
+            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+        )
     ),
   name: 'vc',
   description: 'Manage temporary voice channels or setup Join-to-Create',
-  aliases: ['voice', 'tempvoice', 'massmove', 'movevc', 'massdc', 'massdisconnect', 'vcdc', 'disconnectvc'],
+  aliases: [
+    'voice', 'tempvoice',
+    'massmove', 'movevc',
+    'massdc', 'massdisconnect', 'vcdc', 'disconnectvc',
+    'massmute', 'massunmute', 'vcmute', 'vcunmute', 'mutevc', 'unmutevc'
+  ],
   module: 'join_to_create',
 
   async execute(interaction, client, settings) {
@@ -274,6 +297,88 @@ module.exports = {
         .setDescription(
           `Successfully disconnected **${successCount}** member${successCount === 1 ? '' : 's'} from <#${targetChannel.id}>!` +
           (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be disconnected (missing permissions or already left).*` : '')
+        )
+        .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+        .setTimestamp();
+
+      return interaction.followUp({ embeds: [embed] });
+    }
+
+    // 4. MASS MUTE & UNMUTE COMMAND (Requires MuteMembers or Administrator)
+    if (sub === 'mute' || sub === 'unmute') {
+      const isMute = sub === 'mute';
+
+      if (!interaction.member.permissions.has(PermissionsBitField.Flags.MuteMembers) &&
+          !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return interaction.reply({
+          content: `🚫 You need the **Mute Members** permission to use mass ${isMute ? 'mute' : 'unmute'}.`,
+          ephemeral: true
+        });
+      }
+
+      const guild = interaction.guild;
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      if (!botMember?.permissions.has(PermissionsBitField.Flags.MuteMembers) &&
+          !botMember?.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return interaction.reply({
+          content: `🚫 I do not have the **Mute Members** permission in this server to ${isMute ? 'mute' : 'unmute'} members.`,
+          ephemeral: true
+        });
+      }
+
+      let targetChannel = interaction.options.getChannel('channel');
+
+      if (!targetChannel) {
+        targetChannel = interaction.member.voice?.channel;
+        if (!targetChannel) {
+          return interaction.reply({
+            content: `❌ Please specify the voice channel (\`channel\`) or join a voice channel first!`,
+            ephemeral: true
+          });
+        }
+      }
+
+      if (!targetChannel.isVoiceBased()) {
+        return interaction.reply({ content: '❌ The selected channel must be a voice or stage channel!', ephemeral: true });
+      }
+
+      const channelMembers = [...targetChannel.members.values()];
+      if (channelMembers.length === 0) {
+        return interaction.reply({ content: `⚠️ No members are currently connected to <#${targetChannel.id}>.`, ephemeral: true });
+      }
+
+      const membersToProcess = channelMembers.filter(m => {
+        if (m.id === client.user.id) return false;
+        return isMute ? !m.voice.serverMute : m.voice.serverMute;
+      });
+
+      if (membersToProcess.length === 0) {
+        return interaction.reply({
+          content: `⚠️ All members in <#${targetChannel.id}> are already ${isMute ? 'server muted' : 'server unmuted'}.`,
+          ephemeral: true
+        });
+      }
+
+      await interaction.deferReply();
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const m of membersToProcess) {
+        try {
+          await m.voice.setMute(isMute, `Mass ${isMute ? 'mute' : 'unmute'} by ${interaction.user.tag}`);
+          successCount++;
+        } catch (_) {
+          failCount++;
+        }
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(isMute ? COLORS.WARNING : COLORS.SUCCESS)
+        .setTitle(isMute ? '🔇 Mass Server Mute Completed!' : '🔊 Mass Server Unmute Completed!')
+        .setDescription(
+          `Successfully ${isMute ? 'server muted' : 'server unmuted'} **${successCount}** member${successCount === 1 ? '' : 's'} in <#${targetChannel.id}>!` +
+          (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be ${isMute ? 'muted' : 'unmuted'} (missing permissions or higher role).*` : '')
         )
         .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
         .setTimestamp();
@@ -592,12 +697,86 @@ module.exports = {
         }
       }
 
+      return message.reply({ embeds: [embed] });
+    }
+
+    // +vc mute [#channel] OR +massmute [#channel] OR +vc unmute [#channel] OR +massunmute [#channel]
+    const isMuteAction = action === 'mute' || action === 'massmute' || action === 'servermute' ||
+      invokedCommand === 'massmute' || invokedCommand === 'vcmute' || invokedCommand === 'mutevc';
+    const isUnmuteAction = action === 'unmute' || action === 'massunmute' || action === 'serverunmute' ||
+      invokedCommand === 'massunmute' || invokedCommand === 'vcunmute' || invokedCommand === 'unmutevc';
+
+    if (isMuteAction || isUnmuteAction) {
+      const isMute = isMuteAction;
+
+      if (!message.member.permissions.has(PermissionsBitField.Flags.MuteMembers) &&
+          !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return message.reply(`🚫 You need the **Mute Members** permission to use mass ${isMute ? 'mute' : 'unmute'}.`);
+      }
+
+      const guild = message.guild;
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      if (!botMember?.permissions.has(PermissionsBitField.Flags.MuteMembers) &&
+          !botMember?.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return message.reply(`🚫 I do not have the **Mute Members** permission in this server to ${isMute ? 'mute' : 'unmute'} members.`);
+      }
+
+      const isSubAction = (action === 'mute' || action === 'unmute' || action === 'massmute' || action === 'massunmute' || action === 'servermute' || action === 'serverunmute');
+      const targetArgs = isSubAction ? args.slice(1) : args;
+      const mentionedVoiceChannel = [...message.mentions.channels.values()].find(c => c.isVoiceBased());
+
+      let targetChannel = mentionedVoiceChannel;
+
+      if (!targetChannel && targetArgs[0]) {
+        const rawId = targetArgs[0].replace(/[<#>]/g, '');
+        targetChannel = guild.channels.cache.get(rawId) || guild.channels.cache.find(c => c.isVoiceBased() && c.name.toLowerCase() === targetArgs[0].toLowerCase());
+      }
+
+      if (!targetChannel) {
+        targetChannel = message.member.voice?.channel;
+      }
+
+      if (!targetChannel || !targetChannel.isVoiceBased()) {
+        return message.reply(
+          `❌ Please join a voice channel or specify the voice channel to ${isMute ? 'mute' : 'unmute'} members in!\n` +
+          `• **Usage:** \`+vc ${isMute ? 'mute' : 'unmute'} [#channel]\`\n` +
+          `• **Quick Action:** \`+mass${isMute ? 'mute' : 'unmute'}\` *(applies to your current VC)*\n` +
+          `• **Or:** \`+mass${isMute ? 'mute' : 'unmute'} #General\``
+        );
+      }
+
+      const channelMembers = [...targetChannel.members.values()];
+      if (channelMembers.length === 0) {
+        return message.reply(`⚠️ No members are currently connected to <#${targetChannel.id}>.`);
+      }
+
+      const membersToProcess = channelMembers.filter(m => {
+        if (m.id === client.user.id) return false;
+        return isMute ? !m.voice.serverMute : m.voice.serverMute;
+      });
+
+      if (membersToProcess.length === 0) {
+        return message.reply(`⚠️ All members in <#${targetChannel.id}> are already ${isMute ? 'server muted' : 'server unmuted'}.`);
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const m of membersToProcess) {
+        try {
+          await m.voice.setMute(isMute, `Mass ${isMute ? 'mute' : 'unmute'} by ${message.author.tag}`);
+          successCount++;
+        } catch (_) {
+          failCount++;
+        }
+      }
+
       const embed = new EmbedBuilder()
-        .setColor(COLORS.ERROR)
-        .setTitle('🔌 Mass Disconnect Completed!')
+        .setColor(isMute ? COLORS.WARNING : COLORS.SUCCESS)
+        .setTitle(isMute ? '🔇 Mass Server Mute Completed!' : '🔊 Mass Server Unmute Completed!')
         .setDescription(
-          `Successfully disconnected **${successCount}** member${successCount === 1 ? '' : 's'} from <#${targetChannel.id}>!` +
-          (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be disconnected (missing permissions or already left).*` : '')
+          `Successfully ${isMute ? 'server muted' : 'server unmuted'} **${successCount}** member${successCount === 1 ? '' : 's'} in <#${targetChannel.id}>!` +
+          (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be ${isMute ? 'muted' : 'unmuted'} (missing permissions or higher role).*` : '')
         )
         .setFooter({ text: `Requested by ${message.author.username}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
         .setTimestamp();

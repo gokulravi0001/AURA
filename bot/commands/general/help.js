@@ -35,8 +35,8 @@ function buildHelpEmbed(prefix, client) {
         value: `\`${prefix}bday <DD/MM/YYYY>\` • \`${prefix}bday setuser @user <DD/MM/YYYY> [tz]\` • \`${prefix}bday view [@user]\` • \`${prefix}bday list\` • \`${prefix}bday setup <#wish> [#set]\`\n*Supports saving birthdays for yourself or others with timezones! In the input channel, typing \`DD/MM/YYYY\` auto-deletes for privacy.*`
       },
       {
-        name: '🔊 Voice Lounges, Mass Move & Mass Disconnect',
-        value: `\`${prefix}vc setup\` • \`${prefix}vc move <#to> [#from]\` • \`${prefix}massmove <#to>\` • \`${prefix}vc disconnect [#chan]\` • \`${prefix}massdc [#chan]\` • \`${prefix}vc lock\` • \`${prefix}vc unlock\` • \`${prefix}vc panel\``
+        name: '🔊 Voice Lounges & Mass Actions (Move, DC, Mute/Unmute)',
+        value: `\`${prefix}vc setup\` • \`${prefix}massmove <#to>\` • \`${prefix}massdc [#chan]\` • \`${prefix}massmute [#chan]\` • \`${prefix}massunmute [#chan]\` • \`${prefix}vc lock\` • \`${prefix}vc unlock\` • \`${prefix}vc panel\``
       },
       {
         name: '📊 XP & Leveling',
