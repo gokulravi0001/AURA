@@ -35,8 +35,8 @@ function buildHelpEmbed(prefix, client) {
         value: `\`${prefix}bday <DD/MM/YYYY>\` • \`${prefix}bday setuser @user <DD/MM/YYYY> [tz]\` • \`${prefix}bday view [@user]\` • \`${prefix}bday list\` • \`${prefix}bday setup <#wish> [#set]\`\n*Supports saving birthdays for yourself or others with timezones! In the input channel, typing \`DD/MM/YYYY\` auto-deletes for privacy.*`
       },
       {
-        name: '🔊 Voice Lounges & Mass Actions (Move, DC, Mute/Unmute)',
-        value: `\`${prefix}vc setup\` • \`${prefix}massmove <#to>\` • \`${prefix}massdc [#chan]\` • \`${prefix}massmute [#chan]\` • \`${prefix}massunmute [#chan]\` • \`${prefix}vc lock\` • \`${prefix}vc unlock\` • \`${prefix}vc panel\``
+        name: '🔊 Voice Lounges & Voice Actions (Bounce, Move, DC, Mute)',
+        value: `\`${prefix}vc setup\` • \`${prefix}bounce @user\` • \`${prefix}massmove <#to>\` • \`${prefix}massdc [#chan]\` • \`${prefix}massmute [#chan]\` • \`${prefix}massunmute [#chan]\` • \`${prefix}vc panel\`\n*Use \`${prefix}bounce @user\` to move a member across all voice channels one by one in seconds!*`
       },
       {
         name: '📊 XP & Leveling',

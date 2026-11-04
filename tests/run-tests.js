@@ -247,6 +247,9 @@ test('Features: Voice Controls & Mass Actions (Move, DC, Mute, Unmute) Command',
   assert.ok(voice.aliases.includes('massunmute'));
   assert.ok(voice.aliases.includes('vcmute'));
   assert.ok(voice.aliases.includes('vcunmute'));
+  assert.ok(voice.aliases.includes('bounce'));
+  assert.ok(voice.aliases.includes('vcbounce'));
+  assert.ok(voice.aliases.includes('orbit'));
 
   const json = voice.data.toJSON();
   assert.strictEqual(json.name, 'vc');
@@ -277,6 +280,12 @@ test('Features: Voice Controls & Mass Actions (Move, DC, Mute, Unmute) Command',
   assert.strictEqual(unmuteSub.type, 1);
   const unmuteChanOpt = unmuteSub.options.find(opt => opt.name === 'channel');
   assert.ok(unmuteChanOpt && unmuteChanOpt.required !== true);
+
+  const bounceSub = json.options.find(opt => opt.name === 'bounce');
+  assert.ok(bounceSub, 'Subcommand "bounce" should exist');
+  assert.strictEqual(bounceSub.type, 1);
+  const targetOpt = bounceSub.options.find(opt => opt.name === 'target');
+  assert.ok(targetOpt && targetOpt.required === true);
 });
 
 // 13. Emoji Manager & Selective / Mass Add Verification
