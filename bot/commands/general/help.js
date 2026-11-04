@@ -63,6 +63,10 @@ function buildHelpEmbed(prefix, client) {
         value: `\`${prefix}steal <emojis...>\` • \`${prefix}massadd <emojis...>\` • \`${prefix}emoji packs\` • \`${prefix}emoji add <url> [name]\` • \`${prefix}emoji list\`\n*Mass add all detected emojis or selectively pick via interactive dropdown! Reply to any message with \`${prefix}steal\` to extract its emojis.*`
       },
       {
+        name: '🧹 Chat Moderation & Purge (Reply to Purge)',
+        value: `\`${prefix}purge\` *(reply to a message to purge everything after it)* • \`${prefix}purge include\` • \`${prefix}purge <amount> [@user|bots]\` • \`${prefix}clear\`\n*Quickly clean up chat: reply to any message with \`${prefix}purge\` and AURA deletes all messages sent after it!*`
+      },
+      {
         name: '⚙️ Modular Feature Controls (Turn Features ON/OFF)',
         value: `\`${prefix}modules\` • \`${prefix}modules on <feature|all>\` • \`${prefix}modules off <feature|all>\` • \`${prefix}modules toggle <feature>\`\n*Interactively enable or disable any bot feature selectively with dropdown menus & buttons!*`
       }

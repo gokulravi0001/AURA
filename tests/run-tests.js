@@ -97,6 +97,7 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   const bump = require('../bot/commands/bump/bump');
   const invites = require('../bot/commands/utility/invites');
   const modulesCmd = require('../bot/commands/general/modules');
+  const purge = require('../bot/commands/moderation/purge');
 
   assert.ok(ping.data && ping.executePrefix);
   assert.ok(help.data && help.executePrefix);
@@ -109,6 +110,7 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   assert.ok(bump.data && bump.executePrefix);
   assert.ok(invites.data && invites.executePrefix);
   assert.ok(modulesCmd.data && modulesCmd.executePrefix);
+  assert.ok(purge.data && purge.executePrefix);
 });
 
 // 6. Sticky & Birthday Channel Separation Check
@@ -323,6 +325,30 @@ test('Features: Emoji Manager & Selective / Mass Add System', () => {
   assert.ok(json.options.find(o => o.name === 'add'));
   assert.ok(json.options.find(o => o.name === 'packs'));
   assert.ok(json.options.find(o => o.name === 'list'));
+});
+
+// 14. Purge Command & Reply Purge Verification
+test('Features: Purge Command & Reply-to-Purge Verification', () => {
+  const purgeCmd = require('../bot/commands/moderation/purge');
+
+  assert.ok(purgeCmd.aliases.includes('clear'));
+  assert.ok(purgeCmd.aliases.includes('clean'));
+  assert.ok(purgeCmd.aliases.includes('prune'));
+
+  const json = purgeCmd.data.toJSON();
+  assert.strictEqual(json.name, 'purge');
+
+  const afterSub = json.options.find(o => o.name === 'after');
+  assert.ok(afterSub, 'Subcommand "after" should exist');
+  assert.strictEqual(afterSub.type, 1);
+  const msgIdOpt = afterSub.options.find(o => o.name === 'message_id');
+  assert.ok(msgIdOpt && msgIdOpt.required === true);
+
+  const msgsSub = json.options.find(o => o.name === 'messages');
+  assert.ok(msgsSub, 'Subcommand "messages" should exist');
+  assert.strictEqual(msgsSub.type, 1);
+  const amtOpt = msgsSub.options.find(o => o.name === 'amount');
+  assert.ok(amtOpt && amtOpt.required === true);
 });
 
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
