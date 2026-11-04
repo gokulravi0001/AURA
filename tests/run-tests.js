@@ -233,11 +233,14 @@ test('Features: Birthday Timezone Resolution & Local Time', () => {
   assert.ok(local.minute >= 0 && local.minute <= 59);
 });
 
-// 12. Voice Controls & Mass Move Verification
-test('Features: Voice Controls & Mass Move Command', () => {
+// 12. Voice Controls, Mass Move & Mass Disconnect Verification
+test('Features: Voice Controls, Mass Move & Mass Disconnect Command', () => {
   const voice = require('../bot/commands/voice/voicecontrols');
   assert.ok(voice.aliases.includes('massmove'));
   assert.ok(voice.aliases.includes('movevc'));
+  assert.ok(voice.aliases.includes('massdc'));
+  assert.ok(voice.aliases.includes('massdisconnect'));
+  assert.ok(voice.aliases.includes('vcdc'));
 
   const json = voice.data.toJSON();
   assert.strictEqual(json.name, 'vc');
@@ -249,6 +252,13 @@ test('Features: Voice Controls & Mass Move Command', () => {
   const fromOpt = moveSub.options.find(opt => opt.name === 'from');
   assert.ok(toOpt && toOpt.required === true);
   assert.ok(fromOpt && fromOpt.required !== true);
+
+  const dcSub = json.options.find(opt => opt.name === 'disconnect');
+  assert.ok(dcSub, 'Subcommand "disconnect" should exist');
+  assert.strictEqual(dcSub.type, 1); // 1 = SUB_COMMAND
+
+  const chanOpt = dcSub.options.find(opt => opt.name === 'channel');
+  assert.ok(chanOpt && chanOpt.required !== true);
 });
 
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);

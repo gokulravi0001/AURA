@@ -67,10 +67,19 @@ module.exports = {
             .setDescription('Source voice channel (defaults to your current voice channel)')
             .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
         )
+    )
+    .addSubcommand(sub =>
+      sub.setName('disconnect')
+        .setDescription('Mass disconnect all members from a voice channel')
+        .addChannelOption(opt =>
+          opt.setName('channel')
+            .setDescription('Voice channel to disconnect members from (defaults to your current voice channel)')
+            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+        )
     ),
   name: 'vc',
   description: 'Manage temporary voice channels or setup Join-to-Create',
-  aliases: ['voice', 'tempvoice', 'massmove', 'movevc'],
+  aliases: ['voice', 'tempvoice', 'massmove', 'movevc', 'massdc', 'massdisconnect', 'vcdc', 'disconnectvc'],
   module: 'join_to_create',
 
   async execute(interaction, client, settings) {
@@ -203,6 +212,68 @@ module.exports = {
         .setDescription(
           `Successfully moved **${successCount}** member${successCount === 1 ? '' : 's'} from <#${sourceChannel.id}> to <#${targetChannel.id}>!` +
           (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be moved (missing permissions or disconnected).*` : '')
+        )
+        .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+        .setTimestamp();
+
+      return interaction.followUp({ embeds: [embed] });
+    }
+
+    // 3. MASS DISCONNECT COMMAND (Requires MoveMembers or Administrator)
+    if (sub === 'disconnect') {
+      if (!interaction.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
+          !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return interaction.reply({ content: '🚫 You need the **Move Members** permission to use mass disconnect.', ephemeral: true });
+      }
+
+      const guild = interaction.guild;
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      if (!botMember?.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
+          !botMember?.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return interaction.reply({ content: '🚫 I do not have the **Move Members** permission in this server to disconnect members.', ephemeral: true });
+      }
+
+      let targetChannel = interaction.options.getChannel('channel');
+
+      if (!targetChannel) {
+        targetChannel = interaction.member.voice?.channel;
+        if (!targetChannel) {
+          return interaction.reply({
+            content: '❌ Please specify the voice channel (`channel`) or join a voice channel first!',
+            ephemeral: true
+          });
+        }
+      }
+
+      if (!targetChannel.isVoiceBased()) {
+        return interaction.reply({ content: '❌ The selected channel must be a voice or stage channel!', ephemeral: true });
+      }
+
+      const membersToDisconnect = [...targetChannel.members.values()];
+      if (membersToDisconnect.length === 0) {
+        return interaction.reply({ content: `⚠️ No members are currently connected to <#${targetChannel.id}>.`, ephemeral: true });
+      }
+
+      await interaction.deferReply();
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const m of membersToDisconnect) {
+        try {
+          await m.voice.disconnect();
+          successCount++;
+        } catch (_) {
+          failCount++;
+        }
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.ERROR)
+        .setTitle('🔌 Mass Disconnect Completed!')
+        .setDescription(
+          `Successfully disconnected **${successCount}** member${successCount === 1 ? '' : 's'} from <#${targetChannel.id}>!` +
+          (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be disconnected (missing permissions or already left).*` : '')
         )
         .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
         .setTimestamp();
@@ -456,6 +527,77 @@ module.exports = {
         .setDescription(
           `Successfully moved **${successCount}** member${successCount === 1 ? '' : 's'} from <#${sourceChannel.id}> to <#${targetChannel.id}>!` +
           (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be moved (missing permissions or disconnected).*` : '')
+        )
+        .setFooter({ text: `Requested by ${message.author.username}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
+        .setTimestamp();
+
+      return message.reply({ embeds: [embed] });
+    }
+
+    // +vc disconnect [#channel] OR +massdc [#channel] OR +vc massdc [#channel]
+    const isDisconnectAction = action === 'disconnect' || action === 'massdc' || action === 'dc' || action === 'massdisconnect' ||
+      invokedCommand === 'massdc' || invokedCommand === 'massdisconnect' || invokedCommand === 'vcdc' || invokedCommand === 'disconnectvc';
+
+    if (isDisconnectAction) {
+      if (!message.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
+          !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return message.reply('🚫 You need the **Move Members** permission to use mass disconnect.');
+      }
+
+      const guild = message.guild;
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      if (!botMember?.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
+          !botMember?.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return message.reply('🚫 I do not have the **Move Members** permission in this server to disconnect members.');
+      }
+
+      const isSubAction = (action === 'disconnect' || action === 'massdc' || action === 'dc' || action === 'massdisconnect');
+      const targetArgs = isSubAction ? args.slice(1) : args;
+      const mentionedVoiceChannel = [...message.mentions.channels.values()].find(c => c.isVoiceBased());
+
+      let targetChannel = mentionedVoiceChannel;
+
+      if (!targetChannel && targetArgs[0]) {
+        const rawId = targetArgs[0].replace(/[<#>]/g, '');
+        targetChannel = guild.channels.cache.get(rawId) || guild.channels.cache.find(c => c.isVoiceBased() && c.name.toLowerCase() === targetArgs[0].toLowerCase());
+      }
+
+      if (!targetChannel) {
+        targetChannel = message.member.voice?.channel;
+      }
+
+      if (!targetChannel || !targetChannel.isVoiceBased()) {
+        return message.reply(
+          '❌ Please join a voice channel or specify the voice channel to disconnect members from!\n' +
+          '• **Usage:** `+vc disconnect [#channel]`\n' +
+          '• **Quick Disconnect:** `+massdc` *(disconnects everyone in your current VC)*\n' +
+          '• **Or:** `+massdc #General` *(disconnects everyone in #General)*'
+        );
+      }
+
+      const membersToDisconnect = [...targetChannel.members.values()];
+      if (membersToDisconnect.length === 0) {
+        return message.reply(`⚠️ No members are currently connected to <#${targetChannel.id}>.`);
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const m of membersToDisconnect) {
+        try {
+          await m.voice.disconnect();
+          successCount++;
+        } catch (_) {
+          failCount++;
+        }
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.ERROR)
+        .setTitle('🔌 Mass Disconnect Completed!')
+        .setDescription(
+          `Successfully disconnected **${successCount}** member${successCount === 1 ? '' : 's'} from <#${targetChannel.id}>!` +
+          (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be disconnected (missing permissions or already left).*` : '')
         )
         .setFooter({ text: `Requested by ${message.author.username}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
         .setTimestamp();
