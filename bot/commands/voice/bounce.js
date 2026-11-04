@@ -1,6 +1,7 @@
 const {
   SlashCommandBuilder,
   PermissionsBitField,
+  PermissionFlagsBits,
   ChannelType,
   EmbedBuilder
 } = require('discord.js');
@@ -13,6 +14,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('bounce')
     .setDescription('Move a member across all voice channels one by one in a few seconds')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(opt =>
       opt.setName('target')
         .setDescription('The member to tour across all voice channels')
@@ -36,9 +38,13 @@ module.exports = {
   aliases: ['vcbounce', 'orbit', 'vcorbit', 'tour', 'vctour', 'drag', 'vcdrag'],
 
   async execute(interaction, client, settings) {
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
-        !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return interaction.reply({ content: '🚫 You need the **Move Members** permission to use voice bounce.', ephemeral: true });
+    const isOwner = interaction.guild.ownerId === interaction.user.id;
+    const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    if (!isOwner && !isAdmin) {
+      return interaction.reply({
+        content: '🚫 The `/bounce` command can only be used by the **Server Owner** and **Administrators**.',
+        ephemeral: true
+      });
     }
 
     const guild = interaction.guild;
@@ -142,9 +148,10 @@ module.exports = {
   },
 
   async executePrefix(message, args, client, settings) {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
-        !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return message.reply('🚫 You need the **Move Members** permission to use voice bounce.');
+    const isOwner = message.guild.ownerId === message.author.id;
+    const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    if (!isOwner && !isAdmin) {
+      return message.reply('🚫 The `+bounce` command can only be used by the **Server Owner** and **Administrators**.');
     }
 
     const guild = message.guild;

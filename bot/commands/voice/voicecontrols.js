@@ -58,7 +58,7 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub.setName('move')
-        .setDescription('Mass move all members from one voice channel to another')
+        .setDescription('Mass move all members from one voice channel to another (Owner & Admin only)')
         .addChannelOption(opt =>
           opt.setName('to')
             .setDescription('Destination voice channel')
@@ -73,7 +73,7 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub.setName('disconnect')
-        .setDescription('Mass disconnect all members from a voice channel')
+        .setDescription('Mass disconnect all members from a voice channel (Owner & Admin only)')
         .addChannelOption(opt =>
           opt.setName('channel')
             .setDescription('Voice channel to disconnect members from (defaults to your current voice channel)')
@@ -82,7 +82,7 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub.setName('mute')
-        .setDescription('Mass server-mute all members in a voice channel')
+        .setDescription('Mass server-mute all members in a voice channel (Owner & Admin only)')
         .addChannelOption(opt =>
           opt.setName('channel')
             .setDescription('Voice channel to mute members in (defaults to your current voice channel)')
@@ -91,7 +91,7 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub.setName('unmute')
-        .setDescription('Mass server-unmute all members in a voice channel')
+        .setDescription('Mass server-unmute all members in a voice channel (Owner & Admin only)')
         .addChannelOption(opt =>
           opt.setName('channel')
             .setDescription('Voice channel to unmute members in (defaults to your current voice channel)')
@@ -100,7 +100,7 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub.setName('bounce')
-        .setDescription('Move a member across all voice channels one by one in a few seconds')
+        .setDescription('Move a member across all voice channels one by one in a few seconds (Owner & Admin only)')
         .addUserOption(opt =>
           opt.setName('target')
             .setDescription('Member to move across voice channels')
@@ -196,11 +196,12 @@ module.exports = {
       }
     }
 
-    // 2. MASS MOVE COMMAND (Requires MoveMembers or Administrator)
+    // 2. MASS MOVE COMMAND (Owner and Administrator only)
     if (sub === 'move') {
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
-          !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return interaction.reply({ content: '🚫 You need the **Move Members** permission to use mass move.', ephemeral: true });
+      const isOwner = interaction.guild.ownerId === interaction.user.id;
+      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      if (!isOwner && !isAdmin) {
+        return interaction.reply({ content: '🚫 The `/vc move` command can only be used by the **Server Owner** and **Administrators**.', ephemeral: true });
       }
 
       const guild = interaction.guild;
@@ -267,11 +268,12 @@ module.exports = {
       return interaction.followUp({ embeds: [embed] });
     }
 
-    // 3. MASS DISCONNECT COMMAND (Requires MoveMembers or Administrator)
+    // 3. MASS DISCONNECT COMMAND (Owner and Administrator only)
     if (sub === 'disconnect') {
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
-          !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return interaction.reply({ content: '🚫 You need the **Move Members** permission to use mass disconnect.', ephemeral: true });
+      const isOwner = interaction.guild.ownerId === interaction.user.id;
+      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      if (!isOwner && !isAdmin) {
+        return interaction.reply({ content: '🚫 The `/vc disconnect` command can only be used by the **Server Owner** and **Administrators**.', ephemeral: true });
       }
 
       const guild = interaction.guild;
@@ -329,14 +331,14 @@ module.exports = {
       return interaction.followUp({ embeds: [embed] });
     }
 
-    // 4. MASS MUTE & UNMUTE COMMAND (Requires MuteMembers or Administrator)
+    // 4. MASS MUTE & UNMUTE COMMAND (Owner and Administrator only)
     if (sub === 'mute' || sub === 'unmute') {
       const isMute = sub === 'mute';
-
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.MuteMembers) &&
-          !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+      const isOwner = interaction.guild.ownerId === interaction.user.id;
+      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      if (!isOwner && !isAdmin) {
         return interaction.reply({
-          content: `🚫 You need the **Mute Members** permission to use mass ${isMute ? 'mute' : 'unmute'}.`,
+          content: `🚫 The \`/vc ${isMute ? 'mute' : 'unmute'}\` command can only be used by the **Server Owner** and **Administrators**.`,
           ephemeral: true
         });
       }
@@ -411,11 +413,12 @@ module.exports = {
       return interaction.followUp({ embeds: [embed] });
     }
 
-    // 5. BOUNCE COMMAND (Move member to all VCs one by one)
+    // 5. BOUNCE COMMAND (Owner and Administrator only)
     if (sub === 'bounce') {
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
-          !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return interaction.reply({ content: '🚫 You need the **Move Members** permission to use voice bounce.', ephemeral: true });
+      const isOwner = interaction.guild.ownerId === interaction.user.id;
+      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      if (!isOwner && !isAdmin) {
+        return interaction.reply({ content: '🚫 The `/vc bounce` command can only be used by the **Server Owner** and **Administrators**.', ephemeral: true });
       }
 
       const guild = interaction.guild;
@@ -678,9 +681,10 @@ module.exports = {
     const isMoveAction = action === 'move' || action === 'massmove' || invokedCommand === 'massmove' || invokedCommand === 'movevc';
 
     if (isMoveAction) {
-      if (!message.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
-          !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return message.reply('🚫 You need the **Move Members** permission to use mass move.');
+      const isOwner = message.guild.ownerId === message.author.id;
+      const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      if (!isOwner && !isAdmin) {
+        return message.reply('🚫 The `+vc move` command can only be used by the **Server Owner** and **Administrators**.');
       }
 
       const guild = message.guild;
@@ -774,9 +778,10 @@ module.exports = {
       invokedCommand === 'massdc' || invokedCommand === 'massdisconnect' || invokedCommand === 'vcdc' || invokedCommand === 'disconnectvc';
 
     if (isDisconnectAction) {
-      if (!message.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
-          !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return message.reply('🚫 You need the **Move Members** permission to use mass disconnect.');
+      const isOwner = message.guild.ownerId === message.author.id;
+      const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      if (!isOwner && !isAdmin) {
+        return message.reply('🚫 The `+vc disconnect` command can only be used by the **Server Owner** and **Administrators**.');
       }
 
       const guild = message.guild;
@@ -838,10 +843,10 @@ module.exports = {
 
     if (isMuteAction || isUnmuteAction) {
       const isMute = isMuteAction;
-
-      if (!message.member.permissions.has(PermissionsBitField.Flags.MuteMembers) &&
-          !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return message.reply(`🚫 You need the **Mute Members** permission to use mass ${isMute ? 'mute' : 'unmute'}.`);
+      const isOwner = message.guild.ownerId === message.author.id;
+      const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      if (!isOwner && !isAdmin) {
+        return message.reply(`🚫 The \`+vc ${isMute ? 'mute' : 'unmute'}\` command can only be used by the **Server Owner** and **Administrators**.`);
       }
 
       const guild = message.guild;
@@ -920,9 +925,10 @@ module.exports = {
       invokedCommand === 'vctour' || invokedCommand === 'tour' || invokedCommand === 'drag' || invokedCommand === 'vcdrag';
 
     if (isBounceAction) {
-      if (!message.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
-          !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return message.reply('🚫 You need the **Move Members** permission to use voice bounce.');
+      const isOwner = message.guild.ownerId === message.author.id;
+      const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      if (!isOwner && !isAdmin) {
+        return message.reply('🚫 The `+vc bounce` command can only be used by the **Server Owner** and **Administrators**.');
       }
 
       const guild = message.guild;
