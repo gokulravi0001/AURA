@@ -233,6 +233,24 @@ test('Features: Birthday Timezone Resolution & Local Time', () => {
   assert.ok(local.minute >= 0 && local.minute <= 59);
 });
 
+// 12. Voice Controls & Mass Move Verification
+test('Features: Voice Controls & Mass Move Command', () => {
+  const voice = require('../bot/commands/voice/voicecontrols');
+  assert.ok(voice.aliases.includes('massmove'));
+  assert.ok(voice.aliases.includes('movevc'));
+
+  const json = voice.data.toJSON();
+  assert.strictEqual(json.name, 'vc');
+  const moveSub = json.options.find(opt => opt.name === 'move');
+  assert.ok(moveSub, 'Subcommand "move" should exist');
+  assert.strictEqual(moveSub.type, 1); // 1 = SUB_COMMAND
+
+  const toOpt = moveSub.options.find(opt => opt.name === 'to');
+  const fromOpt = moveSub.options.find(opt => opt.name === 'from');
+  assert.ok(toOpt && toOpt.required === true);
+  assert.ok(fromOpt && fromOpt.required !== true);
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);

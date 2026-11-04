@@ -52,10 +52,25 @@ module.exports = {
     .addSubcommand(sub =>
       sub.setName('panel')
         .setDescription('Send the interactive customization control panel into your voice channel')
+    )
+    .addSubcommand(sub =>
+      sub.setName('move')
+        .setDescription('Mass move all members from one voice channel to another')
+        .addChannelOption(opt =>
+          opt.setName('to')
+            .setDescription('Destination voice channel')
+            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+            .setRequired(true)
+        )
+        .addChannelOption(opt =>
+          opt.setName('from')
+            .setDescription('Source voice channel (defaults to your current voice channel)')
+            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+        )
     ),
   name: 'vc',
   description: 'Manage temporary voice channels or setup Join-to-Create',
-  aliases: ['voice', 'tempvoice'],
+  aliases: ['voice', 'tempvoice', 'massmove', 'movevc'],
   module: 'join_to_create',
 
   async execute(interaction, client, settings) {
@@ -122,6 +137,77 @@ module.exports = {
       } catch (err) {
         return interaction.followUp(`❌ Failed to create channels: ${err.message}`);
       }
+    }
+
+    // 2. MASS MOVE COMMAND (Requires MoveMembers or Administrator)
+    if (sub === 'move') {
+      if (!interaction.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
+          !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return interaction.reply({ content: '🚫 You need the **Move Members** permission to use mass move.', ephemeral: true });
+      }
+
+      const guild = interaction.guild;
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      if (!botMember?.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
+          !botMember?.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return interaction.reply({ content: '🚫 I do not have the **Move Members** permission in this server to move members.', ephemeral: true });
+      }
+
+      const targetChannel = interaction.options.getChannel('to');
+      let sourceChannel = interaction.options.getChannel('from');
+
+      if (!sourceChannel) {
+        sourceChannel = interaction.member.voice?.channel;
+        if (!sourceChannel) {
+          return interaction.reply({
+            content: '❌ Please specify the source voice channel (`from`) or join a voice channel first!',
+            ephemeral: true
+          });
+        }
+      }
+
+      if (!targetChannel.isVoiceBased()) {
+        return interaction.reply({ content: '❌ The destination channel must be a voice or stage channel!', ephemeral: true });
+      }
+
+      if (!sourceChannel.isVoiceBased()) {
+        return interaction.reply({ content: '❌ The source channel must be a voice or stage channel!', ephemeral: true });
+      }
+
+      if (sourceChannel.id === targetChannel.id) {
+        return interaction.reply({ content: '❌ The source and destination voice channels cannot be the same!', ephemeral: true });
+      }
+
+      const membersToMove = [...sourceChannel.members.values()];
+      if (membersToMove.length === 0) {
+        return interaction.reply({ content: `⚠️ No members are currently connected to <#${sourceChannel.id}>.`, ephemeral: true });
+      }
+
+      await interaction.deferReply();
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const m of membersToMove) {
+        try {
+          await m.voice.setChannel(targetChannel.id);
+          successCount++;
+        } catch (_) {
+          failCount++;
+        }
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.SUCCESS)
+        .setTitle('🚚 Mass Move Completed!')
+        .setDescription(
+          `Successfully moved **${successCount}** member${successCount === 1 ? '' : 's'} from <#${sourceChannel.id}> to <#${targetChannel.id}>!` +
+          (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be moved (missing permissions or disconnected).*` : '')
+        )
+        .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+        .setTimestamp();
+
+      return interaction.followUp({ embeds: [embed] });
     }
 
     // Voice controls require being inside a temp channel
@@ -278,6 +364,103 @@ module.exports = {
       const movePermNotice = hasMoveMembers ? '' : '\n\n⚠️ **Warning:** The bot role is missing the **Move Members** permission in server settings! Please enable **Move Members** for the bot role so it can automatically move members into their newly created rooms.';
 
       return message.reply(`🎉 Join-to-Create Voice setup complete! Category: **${category.name}**, Trigger: <#${trigger.id}>.${movePermNotice}`);
+    }
+
+    // +vc move <#to> [#from] OR +massmove <#to> [#from]
+    const prefix = settings?.prefix || '+';
+    const invokedCommand = message.content.slice(prefix.length).trim().split(/ +/)[0]?.toLowerCase();
+    const isMoveAction = action === 'move' || action === 'massmove' || invokedCommand === 'massmove' || invokedCommand === 'movevc';
+
+    if (isMoveAction) {
+      if (!message.member.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
+          !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return message.reply('🚫 You need the **Move Members** permission to use mass move.');
+      }
+
+      const guild = message.guild;
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      if (!botMember?.permissions.has(PermissionsBitField.Flags.MoveMembers) &&
+          !botMember?.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        return message.reply('🚫 I do not have the **Move Members** permission in this server to move members.');
+      }
+
+      // If invoked as +vc move <#to> [#from], skip the action word 'move'/'massmove'
+      const targetArgs = (action === 'move' || action === 'massmove') ? args.slice(1) : args;
+      const mentionedChannels = [...message.mentions.channels.values()].filter(c => c.isVoiceBased());
+
+      let targetChannel = null;
+      let sourceChannel = null;
+
+      if (mentionedChannels.length >= 2) {
+        targetChannel = mentionedChannels[0];
+        sourceChannel = mentionedChannels[1];
+      } else if (mentionedChannels.length === 1) {
+        targetChannel = mentionedChannels[0];
+        if (targetArgs[1]) {
+          const rawId = targetArgs[1].replace(/[<#>]/g, '');
+          sourceChannel = guild.channels.cache.get(rawId) || guild.channels.cache.find(c => c.isVoiceBased() && c.name.toLowerCase() === targetArgs[1].toLowerCase());
+        }
+      } else {
+        if (targetArgs[0]) {
+          const rawId1 = targetArgs[0].replace(/[<#>]/g, '');
+          targetChannel = guild.channels.cache.get(rawId1) || guild.channels.cache.find(c => c.isVoiceBased() && c.name.toLowerCase() === targetArgs[0].toLowerCase());
+        }
+        if (targetArgs[1]) {
+          const rawId2 = targetArgs[1].replace(/[<#>]/g, '');
+          sourceChannel = guild.channels.cache.get(rawId2) || guild.channels.cache.find(c => c.isVoiceBased() && c.name.toLowerCase() === targetArgs[1].toLowerCase());
+        }
+      }
+
+      // If sourceChannel is still not specified, default to the channel the user is currently in
+      if (!sourceChannel) {
+        sourceChannel = message.member.voice?.channel;
+      }
+
+      if (!targetChannel || !targetChannel.isVoiceBased()) {
+        return message.reply(
+          '❌ Please specify the destination voice channel!\n' +
+          '• **Usage:** `+vc move <#destination-vc> [#source-vc]`\n' +
+          '• **Quick Move:** `+vc move #General` *(moves everyone from your current voice channel into General)*\n' +
+          '• **Or:** `+massmove <#destination-vc> [#source-vc]`'
+        );
+      }
+
+      if (!sourceChannel || !sourceChannel.isVoiceBased()) {
+        return message.reply('❌ Please join a voice channel or specify the source channel to move from!\n• Example: `+vc move #TargetVC #SourceVC`');
+      }
+
+      if (sourceChannel.id === targetChannel.id) {
+        return message.reply('❌ The source and destination voice channels cannot be the same!');
+      }
+
+      const membersToMove = [...sourceChannel.members.values()];
+      if (membersToMove.length === 0) {
+        return message.reply(`⚠️ No members are currently connected to <#${sourceChannel.id}>.`);
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const m of membersToMove) {
+        try {
+          await m.voice.setChannel(targetChannel.id);
+          successCount++;
+        } catch (_) {
+          failCount++;
+        }
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.SUCCESS)
+        .setTitle('🚚 Mass Move Completed!')
+        .setDescription(
+          `Successfully moved **${successCount}** member${successCount === 1 ? '' : 's'} from <#${sourceChannel.id}> to <#${targetChannel.id}>!` +
+          (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be moved (missing permissions or disconnected).*` : '')
+        )
+        .setFooter({ text: `Requested by ${message.author.username}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
+        .setTimestamp();
+
+      return message.reply({ embeds: [embed] });
     }
 
     const voiceChannel = message.member?.voice?.channel;
