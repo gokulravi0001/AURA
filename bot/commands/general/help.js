@@ -59,6 +59,10 @@ function buildHelpEmbed(prefix, client) {
         value: `\`${prefix}rps [@user]\` • \`${prefix}trivia\` • \`${prefix}count [setup #chan]\` • \`${prefix}chain [setup #chan]\` • \`${prefix}bump [done|setup]\``
       },
       {
+        name: '✨ Emoji Stealer & Curated Packs (Mass & Selective Add)',
+        value: `\`${prefix}steal <emojis...>\` • \`${prefix}massadd <emojis...>\` • \`${prefix}emoji packs\` • \`${prefix}emoji add <url> [name]\` • \`${prefix}emoji list\`\n*Mass add all detected emojis or selectively pick via interactive dropdown! Reply to any message with \`${prefix}steal\` to extract its emojis.*`
+      },
+      {
         name: '⚙️ Modular Feature Controls (Turn Features ON/OFF)',
         value: `\`${prefix}modules\` • \`${prefix}modules on <feature|all>\` • \`${prefix}modules off <feature|all>\` • \`${prefix}modules toggle <feature>\`\n*Interactively enable or disable any bot feature selectively with dropdown menus & buttons!*`
       }

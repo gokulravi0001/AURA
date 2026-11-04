@@ -277,6 +277,54 @@ test('Features: Voice Controls & Mass Actions (Move, DC, Mute, Unmute) Command',
   assert.ok(unmuteChanOpt && unmuteChanOpt.required !== true);
 });
 
+// 13. Emoji Manager & Selective / Mass Add Verification
+test('Features: Emoji Manager & Selective / Mass Add System', () => {
+  const emojiManager = require('../bot/modules/emojiManager');
+  const emojiCmd = require('../bot/commands/utility/emoji');
+
+  // Verify parser
+  const sampleText = 'Look at this <:pepe_happy:102030405060708090> and <a:party_cat:908070605040302010> https://example.com/art.png';
+  const parsed = emojiManager.parseEmojis(sampleText);
+  assert.strictEqual(parsed.length, 3);
+  assert.strictEqual(parsed[0].name, 'pepe_happy');
+  assert.strictEqual(parsed[0].animated, false);
+  assert.strictEqual(parsed[0].url, 'https://cdn.discordapp.com/emojis/102030405060708090.png');
+  assert.strictEqual(parsed[1].name, 'party_cat');
+  assert.strictEqual(parsed[1].animated, true);
+  assert.strictEqual(parsed[1].url, 'https://cdn.discordapp.com/emojis/908070605040302010.gif');
+  assert.strictEqual(parsed[2].name, 'art');
+
+  // Verify packs
+  assert.ok(emojiManager.EMOJI_PACKS.pepe);
+  assert.ok(emojiManager.EMOJI_PACKS.anime);
+  assert.ok(emojiManager.EMOJI_PACKS.gaming);
+  assert.ok(emojiManager.EMOJI_PACKS.aesthetic);
+  assert.ok(emojiManager.EMOJI_PACKS.badges);
+  assert.ok(emojiManager.EMOJI_PACKS.pepe.emojis.length >= 5);
+
+  // Verify session and selective panel
+  const sessionId = emojiManager.createSession('user1', 'guild1', parsed, 'Test Emojis');
+  const mockGuild = {
+    premiumTier: 0,
+    emojis: {
+      cache: new Map()
+    }
+  };
+  const panel = emojiManager.buildSelectivePanel(sessionId, mockGuild);
+  assert.ok(panel.embeds && panel.embeds.length === 1);
+  assert.ok(panel.components && panel.components.length === 2);
+
+  // Verify command options and aliases
+  assert.ok(emojiCmd.aliases.includes('steal'));
+  assert.ok(emojiCmd.aliases.includes('massadd'));
+  const json = emojiCmd.data.toJSON();
+  assert.strictEqual(json.name, 'emoji');
+  assert.ok(json.options.find(o => o.name === 'steal'));
+  assert.ok(json.options.find(o => o.name === 'add'));
+  assert.ok(json.options.find(o => o.name === 'packs'));
+  assert.ok(json.options.find(o => o.name === 'list'));
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);

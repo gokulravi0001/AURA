@@ -19,7 +19,8 @@ const GuildSchema = new mongoose.Schema({
     minigames: { type: Boolean, default: true },
     tickets: { type: Boolean, default: true },
     bump_reminder: { type: Boolean, default: true },
-    invite_tracker: { type: Boolean, default: true }
+    invite_tracker: { type: Boolean, default: true },
+    emoji_manager: { type: Boolean, default: true }
   },
 
   leveling: {

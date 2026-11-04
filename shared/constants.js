@@ -29,7 +29,8 @@ module.exports = {
     MINIGAMES: 'minigames',
     TICKETS: 'tickets',
     BUMP_REMINDER: 'bump_reminder',
-    INVITE_TRACKER: 'invite_tracker'
+    INVITE_TRACKER: 'invite_tracker',
+    EMOJI_MANAGER: 'emoji_manager'
   },
 
   // Default Guild Configuration
@@ -46,7 +47,8 @@ module.exports = {
       minigames: true,
       tickets: true,
       bump_reminder: true,
-      invite_tracker: true
+      invite_tracker: true,
+      emoji_manager: true
     },
     language: 'en',
     timezone: 'UTC'

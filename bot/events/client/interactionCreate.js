@@ -103,6 +103,13 @@ module.exports = {
           return;
         }
 
+        // Emoji manager buttons: emoji_btn_all_, emoji_btn_selected_, emoji_btn_cancel_
+        if (customId.startsWith('emoji_btn_')) {
+          const emojiManager = require('../../modules/emojiManager');
+          await emojiManager.handleButton(interaction, client);
+          return;
+        }
+
         // Module management buttons: btn_modules_enable_all, btn_modules_disable_all, btn_modules_refresh
         if (customId.startsWith('btn_modules_')) {
           if (!interaction.member?.permissions?.has(PermissionsBitField.Flags.Administrator)) {
@@ -200,6 +207,13 @@ module.exports = {
 
           const panel = modulesCommand.buildModulesPanel(updated, interaction.guild);
           await interaction.update({ embeds: panel.embeds, components: panel.components });
+          return;
+        }
+
+        // Emoji manager select menus: emoji_pack_select, emoji_select_
+        if (customId === 'emoji_pack_select' || customId.startsWith('emoji_select_')) {
+          const emojiManager = require('../../modules/emojiManager');
+          await emojiManager.handleSelectMenu(interaction, client);
           return;
         }
 

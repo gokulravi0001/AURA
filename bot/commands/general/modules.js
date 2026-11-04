@@ -21,7 +21,8 @@ const MODULE_DEFINITIONS = [
   { key: 'image_threads', name: 'Auto Image Threads', emoji: '💬', desc: 'Automatic discussion threads on image posts' },
   { key: 'minigames', name: 'Interactive Minigames', emoji: '🎮', desc: 'Counting, Word Chain, Trivia & RPS' },
   { key: 'bump_reminder', name: 'Bump Reminder', emoji: '⏰', desc: 'Tracks Disboard bump timers & sends reminders' },
-  { key: 'invite_tracker', name: 'Invite Tracker', emoji: '📈', desc: 'Tracks who invited members, leaves & alts' }
+  { key: 'invite_tracker', name: 'Invite Tracker', emoji: '📈', desc: 'Tracks who invited members, leaves & alts' },
+  { key: 'emoji_manager', name: 'Emoji Stealer & Packs', emoji: '✨', desc: 'Mass add, selective add & curated emoji packs' }
 ];
 
 const MODULE_ALIASES = {
@@ -34,7 +35,8 @@ const MODULE_ALIASES = {
   thread: 'image_threads', threads: 'image_threads', image_threads: 'image_threads', imagethreads: 'image_threads',
   games: 'minigames', minigames: 'minigames', counting: 'minigames', wordchain: 'minigames',
   bump: 'bump_reminder', bump_reminder: 'bump_reminder', bumpreminder: 'bump_reminder',
-  invites: 'invite_tracker', invite: 'invite_tracker', invite_tracker: 'invite_tracker', invitetracker: 'invite_tracker'
+  invites: 'invite_tracker', invite: 'invite_tracker', invite_tracker: 'invite_tracker', invitetracker: 'invite_tracker',
+  emoji: 'emoji_manager', emojis: 'emoji_manager', steal: 'emoji_manager', emoji_manager: 'emoji_manager'
 };
 
 function buildModulesPanel(settings, guild) {
