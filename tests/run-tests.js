@@ -98,6 +98,7 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   const invites = require('../bot/commands/utility/invites');
   const modulesCmd = require('../bot/commands/general/modules');
   const purge = require('../bot/commands/moderation/purge');
+  const bounce = require('../bot/commands/voice/bounce');
 
   assert.ok(ping.data && ping.executePrefix);
   assert.ok(help.data && help.executePrefix);
@@ -111,6 +112,7 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   assert.ok(invites.data && invites.executePrefix);
   assert.ok(modulesCmd.data && modulesCmd.executePrefix);
   assert.ok(purge.data && purge.executePrefix);
+  assert.ok(bounce.data && bounce.executePrefix);
 });
 
 // 6. Sticky & Birthday Channel Separation Check
