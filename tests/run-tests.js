@@ -288,6 +288,15 @@ test('Features: Voice Controls & Mass Actions (Move, DC, Mute, Unmute) Command',
   assert.strictEqual(bounceSub.type, 1);
   const targetOpt = bounceSub.options.find(opt => opt.name === 'target');
   assert.ok(targetOpt && targetOpt.required === true);
+  const roundsOpt = bounceSub.options.find(opt => opt.name === 'rounds');
+  assert.ok(roundsOpt && roundsOpt.min_value === 1 && roundsOpt.max_value === 100);
+
+  // Top-level bounce command check
+  const bounceCmd = require('../bot/commands/voice/bounce');
+  const bounceJson = bounceCmd.data.toJSON();
+  assert.strictEqual(bounceJson.name, 'bounce');
+  const topRounds = bounceJson.options.find(o => o.name === 'rounds');
+  assert.ok(topRounds && topRounds.min_value === 1 && topRounds.max_value === 100);
 });
 
 // 13. Emoji Manager & Selective / Mass Add Verification
