@@ -2,6 +2,7 @@ const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder } = 
 const Guild = require('../../../models/Guild');
 const bumpService = require('../../modules/bumpService');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -49,7 +50,7 @@ module.exports = {
     }
 
     if (sub === 'setup') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
 
@@ -88,7 +89,7 @@ module.exports = {
     }
 
     if (action === 'setup') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
         return message.reply('🚫 Administrator permission required.');
       }
 

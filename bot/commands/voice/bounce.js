@@ -1,11 +1,11 @@
 const {
   SlashCommandBuilder,
   PermissionsBitField,
-  PermissionFlagsBits,
   ChannelType,
   EmbedBuilder
 } = require('discord.js');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 // Map to manage active bounce operations: userId -> { cancel: boolean }
 const activeBounces = new Map();
@@ -14,7 +14,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('bounce')
     .setDescription('Move a member across all voice channels one by one in a few seconds')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(opt =>
       opt.setName('target')
         .setDescription('The member to tour across all voice channels')
@@ -38,11 +37,9 @@ module.exports = {
   aliases: ['vcbounce', 'orbit', 'vcorbit', 'tour', 'vctour', 'drag', 'vcdrag'],
 
   async execute(interaction, client, settings) {
-    const isOwner = interaction.guild.ownerId === interaction.user.id;
-    const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-    if (!isOwner && !isAdmin) {
+    if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
       return interaction.reply({
-        content: '🚫 The `/bounce` command can only be used by the **Server Owner** and **Administrators**.',
+        content: '🚫 The `/bounce` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.',
         ephemeral: true
       });
     }
@@ -148,10 +145,8 @@ module.exports = {
   },
 
   async executePrefix(message, args, client, settings) {
-    const isOwner = message.guild.ownerId === message.author.id;
-    const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
-    if (!isOwner && !isAdmin) {
-      return message.reply('🚫 The `+bounce` command can only be used by the **Server Owner** and **Administrators**.');
+    if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
+      return message.reply('🚫 The `+bounce` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.');
     }
 
     const guild = message.guild;

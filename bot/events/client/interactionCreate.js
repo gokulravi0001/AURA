@@ -2,6 +2,7 @@ const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 const logger = require('../../../shared/logger');
 const guildService = require('../../../shared/guildService');
 const { COLORS } = require('../../../shared/constants');
+const { isBotOwner, isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   name: 'interactionCreate',
@@ -27,9 +28,10 @@ module.exports = {
         try { sub = interaction.options.getSubcommand(false); } catch (e) {}
 
         const isSetupSubcommand = ['setup', 'enable', 'config'].includes(sub);
-        const isAdmin = interaction.member?.permissions?.has(PermissionsBitField.Flags.Administrator);
+        const isBotDev = isBotOwner(interaction.user.id, client);
+        const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
 
-        if (command.module && settings && settings.modules && settings.modules[command.module] === false) {
+        if (command.module && settings && settings.modules && settings.modules[command.module] === false && !isBotDev) {
           if (isSetupSubcommand && isAdmin) {
             // Auto re-enable module when administrator configures or runs it
             settings.modules[command.module] = true;
@@ -52,8 +54,8 @@ module.exports = {
           }
         }
 
-        // Permission check
-        if (command.permissions && interaction.member) {
+        // Permission check (Bypassed for Bot Developers / Owners)
+        if (!isBotDev && command.permissions && interaction.member) {
           const missing = [];
           for (const perm of command.permissions) {
             if (!interaction.member.permissions.has(perm)) {
@@ -112,7 +114,7 @@ module.exports = {
 
         // Module management buttons: btn_modules_enable_all, btn_modules_disable_all, btn_modules_refresh
         if (customId.startsWith('btn_modules_')) {
-          if (!interaction.member?.permissions?.has(PermissionsBitField.Flags.Administrator)) {
+          if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
             return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
           }
 
@@ -189,7 +191,7 @@ module.exports = {
 
         // Module toggle select menu
         if (customId === 'select_module_toggle') {
-          if (!interaction.member?.permissions?.has(PermissionsBitField.Flags.Administrator)) {
+          if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
             return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
           }
 

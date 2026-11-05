@@ -5,12 +5,12 @@ const {
   EmbedBuilder
 } = require('discord.js');
 const { COLORS } = require('../../../shared/constants');
+const { hasPermissionOrOwner } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('purge')
     .setDescription('Bulk delete messages or clean up spam bot aftermath')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addSubcommand(sub =>
       sub.setName('after')
         .setDescription('Delete all messages sent after (and including) a specific message ID')
@@ -61,9 +61,8 @@ module.exports = {
     const channel = interaction.channel;
     const guild = interaction.guild;
 
-    // Check user permission
-    const hasUserPerm = interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages) ||
-                        interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    // Check user permission (Bypassed for Bot Developers / Owners)
+    const hasUserPerm = hasPermissionOrOwner(interaction.member || interaction.user, PermissionsBitField.Flags.ManageMessages, client);
     if (!hasUserPerm) {
       return interaction.reply({ content: '🚫 You need the **Manage Messages** permission to use purge.', ephemeral: true });
     }
@@ -145,9 +144,8 @@ module.exports = {
     const channel = message.channel;
     const guild = message.guild;
 
-    // Check user permission
-    const hasUserPerm = message.member.permissions.has(PermissionsBitField.Flags.ManageMessages) ||
-                        message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    // Check user permission (Bypassed for Bot Developers / Owners)
+    const hasUserPerm = hasPermissionOrOwner(message.member || message.author, PermissionsBitField.Flags.ManageMessages, client);
     if (!hasUserPerm) {
       const warn = await message.reply('🚫 You need the **Manage Messages** permission to use purge.');
       setTimeout(() => warn.delete().catch(() => {}), 5000);

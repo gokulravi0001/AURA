@@ -12,6 +12,7 @@ const {
 const TempVoice = require('../../models/TempVoice');
 const logger = require('../../shared/logger');
 const { COLORS } = require('../../shared/constants');
+const { isOwnerOrAdmin } = require('../../shared/permissionHelper');
 
 const voiceManager = {
   /**
@@ -270,7 +271,7 @@ const voiceManager = {
     }
 
     const isOwner = tempDoc.ownerId === interaction.user.id;
-    const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
 
     // 1. CLAIM OWNERSHIP
     if (customId === 'vc_claim') {
@@ -426,7 +427,7 @@ const voiceManager = {
       }
 
       const isOwner = tempDoc.ownerId === interaction.user.id;
-      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
       if (!isOwner && !isAdmin) {
         return interaction.reply({ content: '🚫 Only the channel owner can rename this channel.', ephemeral: true });
       }
@@ -450,7 +451,7 @@ const voiceManager = {
       }
 
       const isOwner = tempDoc.ownerId === interaction.user.id;
-      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
       if (!isOwner && !isAdmin) {
         return interaction.reply({ content: '🚫 Only the channel owner can set the limit.', ephemeral: true });
       }

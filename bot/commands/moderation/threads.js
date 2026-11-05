@@ -6,7 +6,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('thread')
     .setDescription('Configure automatic discussion threads for image posts (Admin only)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .addSubcommand(sub =>
       sub.setName('setup')
         .setDescription('Set the channel monitored for image thread creation')

@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const Guild = require('../../../models/Guild');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -37,7 +38,7 @@ module.exports = {
     }
 
     if (sub === 'add') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
 
@@ -66,7 +67,7 @@ module.exports = {
     }
 
     if (sub === 'remove') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
 
@@ -98,7 +99,7 @@ module.exports = {
     if (!guildDoc) guildDoc = await Guild.create({ guildId: message.guild.id });
 
     if (action === 'add') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
         return message.reply('🚫 Administrator permission required.');
       }
 
@@ -120,7 +121,7 @@ module.exports = {
     }
 
     if (action === 'remove') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
         return message.reply('🚫 Administrator permission required.');
       }
 

@@ -7,7 +7,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('addxp')
     .setDescription('Add XP to a server member (Admin only)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(opt => opt.setName('user').setDescription('The target user').setRequired(true))
     .addIntegerOption(opt => opt.setName('amount').setDescription('Amount of XP to add').setRequired(true)),
   name: 'addxp',

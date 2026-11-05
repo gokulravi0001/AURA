@@ -8,6 +8,7 @@ const TempVoice = require('../../../models/TempVoice');
 const Guild = require('../../../models/Guild');
 const guildService = require('../../../shared/guildService');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 // Map to manage active bounce operations: userId -> { cancel: boolean }
 const activeBounces = new Map();
@@ -135,7 +136,7 @@ module.exports = {
 
     // 1. SETUP COMMAND (Admin only)
     if (sub === 'setup') {
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
 
@@ -196,12 +197,10 @@ module.exports = {
       }
     }
 
-    // 2. MASS MOVE COMMAND (Owner and Administrator only)
+    // 2. MASS MOVE COMMAND (Owner, Admin, and Bot Developer only)
     if (sub === 'move') {
-      const isOwner = interaction.guild.ownerId === interaction.user.id;
-      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-      if (!isOwner && !isAdmin) {
-        return interaction.reply({ content: '🚫 The `/vc move` command can only be used by the **Server Owner** and **Administrators**.', ephemeral: true });
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
+        return interaction.reply({ content: '🚫 The `/vc move` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.', ephemeral: true });
       }
 
       const guild = interaction.guild;
@@ -268,12 +267,10 @@ module.exports = {
       return interaction.followUp({ embeds: [embed] });
     }
 
-    // 3. MASS DISCONNECT COMMAND (Owner and Administrator only)
+    // 3. MASS DISCONNECT COMMAND (Owner, Admin, and Bot Developer only)
     if (sub === 'disconnect') {
-      const isOwner = interaction.guild.ownerId === interaction.user.id;
-      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-      if (!isOwner && !isAdmin) {
-        return interaction.reply({ content: '🚫 The `/vc disconnect` command can only be used by the **Server Owner** and **Administrators**.', ephemeral: true });
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
+        return interaction.reply({ content: '🚫 The `/vc disconnect` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.', ephemeral: true });
       }
 
       const guild = interaction.guild;
@@ -331,14 +328,12 @@ module.exports = {
       return interaction.followUp({ embeds: [embed] });
     }
 
-    // 4. MASS MUTE & UNMUTE COMMAND (Owner and Administrator only)
+    // 4. MASS MUTE & UNMUTE COMMAND (Owner, Admin, and Bot Developer only)
     if (sub === 'mute' || sub === 'unmute') {
       const isMute = sub === 'mute';
-      const isOwner = interaction.guild.ownerId === interaction.user.id;
-      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-      if (!isOwner && !isAdmin) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({
-          content: `🚫 The \`/vc ${isMute ? 'mute' : 'unmute'}\` command can only be used by the **Server Owner** and **Administrators**.`,
+          content: `🚫 The \`/vc ${isMute ? 'mute' : 'unmute'}\` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.`,
           ephemeral: true
         });
       }
@@ -413,12 +408,10 @@ module.exports = {
       return interaction.followUp({ embeds: [embed] });
     }
 
-    // 5. BOUNCE COMMAND (Owner and Administrator only)
+    // 5. BOUNCE COMMAND (Owner, Admin, and Bot Developer only)
     if (sub === 'bounce') {
-      const isOwner = interaction.guild.ownerId === interaction.user.id;
-      const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-      if (!isOwner && !isAdmin) {
-        return interaction.reply({ content: '🚫 The `/vc bounce` command can only be used by the **Server Owner** and **Administrators**.', ephemeral: true });
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
+        return interaction.reply({ content: '🚫 The `/vc bounce` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.', ephemeral: true });
       }
 
       const guild = interaction.guild;
@@ -531,7 +524,7 @@ module.exports = {
     }
 
     const isOwner = tempDoc.ownerId === interaction.user.id;
-    const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
 
     if (!isOwner && !isAdmin) {
       return interaction.reply({ content: '🚫 Only the channel creator or an administrator can manage this voice lounge.', ephemeral: true });
@@ -627,7 +620,7 @@ module.exports = {
 
     // +vc setup
     if (action === 'setup') {
-      if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
         return message.reply('🚫 Administrator permission required.');
       }
 
@@ -681,10 +674,8 @@ module.exports = {
     const isMoveAction = action === 'move' || action === 'massmove' || invokedCommand === 'massmove' || invokedCommand === 'movevc';
 
     if (isMoveAction) {
-      const isOwner = message.guild.ownerId === message.author.id;
-      const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
-      if (!isOwner && !isAdmin) {
-        return message.reply('🚫 The `+vc move` command can only be used by the **Server Owner** and **Administrators**.');
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
+        return message.reply('🚫 The `+vc move` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.');
       }
 
       const guild = message.guild;
@@ -778,10 +769,8 @@ module.exports = {
       invokedCommand === 'massdc' || invokedCommand === 'massdisconnect' || invokedCommand === 'vcdc' || invokedCommand === 'disconnectvc';
 
     if (isDisconnectAction) {
-      const isOwner = message.guild.ownerId === message.author.id;
-      const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
-      if (!isOwner && !isAdmin) {
-        return message.reply('🚫 The `+vc disconnect` command can only be used by the **Server Owner** and **Administrators**.');
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
+        return message.reply('🚫 The `+vc disconnect` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.');
       }
 
       const guild = message.guild;
@@ -843,10 +832,8 @@ module.exports = {
 
     if (isMuteAction || isUnmuteAction) {
       const isMute = isMuteAction;
-      const isOwner = message.guild.ownerId === message.author.id;
-      const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
-      if (!isOwner && !isAdmin) {
-        return message.reply(`🚫 The \`+vc ${isMute ? 'mute' : 'unmute'}\` command can only be used by the **Server Owner** and **Administrators**.`);
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
+        return message.reply(`🚫 The \`+vc ${isMute ? 'mute' : 'unmute'}\` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.`);
       }
 
       const guild = message.guild;
@@ -925,10 +912,8 @@ module.exports = {
       invokedCommand === 'vctour' || invokedCommand === 'tour' || invokedCommand === 'drag' || invokedCommand === 'vcdrag';
 
     if (isBounceAction) {
-      const isOwner = message.guild.ownerId === message.author.id;
-      const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
-      if (!isOwner && !isAdmin) {
-        return message.reply('🚫 The `+vc bounce` command can only be used by the **Server Owner** and **Administrators**.');
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
+        return message.reply('🚫 The `+vc bounce` command can only be used by the **Bot Developer**, **Server Owner**, and **Administrators**.');
       }
 
       const guild = message.guild;
@@ -1079,7 +1064,10 @@ module.exports = {
       return message.reply('❌ This channel is not a bot-managed temporary voice channel.');
     }
 
-    if (tempDoc.ownerId !== message.author.id && !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+    const isOwner = tempDoc.ownerId === message.author.id;
+    const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
+
+    if (!isOwner && !isAdmin) {
       return message.reply('🚫 Only the channel creator or an administrator can manage this voice lounge.');
     }
 

@@ -2,12 +2,12 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('disc
 const counterService = require('../../modules/counterService');
 const Guild = require('../../../models/Guild');
 const { COLORS } = require('../../../shared/constants');
+const { hasPermissionOrOwner } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('counter')
     .setDescription('Automated server stat counters setup & management (Admin only)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .addSubcommand(sub =>
       sub.setName('setup')
         .setDescription('Automatically create stats category and locked voice counter channels')
@@ -98,7 +98,7 @@ module.exports = {
   },
 
   async executePrefix(message, args, client) {
-    if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
+    if (!hasPermissionOrOwner(message.member || message.author, PermissionFlagsBits.ManageChannels, client)) {
       return message.reply('🚫 Manage Channels permission required.');
     }
 

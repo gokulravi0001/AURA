@@ -8,6 +8,7 @@ const ticketManager = require('../../modules/ticketManager');
 const Ticket = require('../../../models/Ticket');
 const Guild = require('../../../models/Guild');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -63,7 +64,7 @@ module.exports = {
 
     // 1. PANEL
     if (sub === 'panel') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
 
@@ -77,7 +78,7 @@ module.exports = {
 
     // 2. SETUP
     if (sub === 'setup') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
 

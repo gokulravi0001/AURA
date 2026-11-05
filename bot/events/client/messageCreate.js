@@ -2,6 +2,7 @@ const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 const logger = require('../../../shared/logger');
 const guildService = require('../../../shared/guildService');
 const { COLORS } = require('../../../shared/constants');
+const { isBotOwner, isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 // Module handlers
 const levelingService = require('../../modules/levelingService');
@@ -46,9 +47,10 @@ module.exports = {
           // Check module enabled
           const subAction = args[0]?.toLowerCase();
           const isSetupSubcommand = ['setup', 'enable', 'config'].includes(subAction);
-          const isAdmin = message.member?.permissions?.has(PermissionsBitField.Flags.Administrator);
+          const isBotDev = isBotOwner(message.author.id, client);
+          const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
 
-          if (command.module && settings && settings.modules && settings.modules[command.module] === false) {
+          if (command.module && settings && settings.modules && settings.modules[command.module] === false && !isBotDev) {
             if (isSetupSubcommand && isAdmin) {
               settings.modules[command.module] = true;
               const Guild = require('../../../models/Guild');
@@ -69,8 +71,8 @@ module.exports = {
             }
           }
 
-          // Permission check
-          if (command.permissions && message.member) {
+          // Permission check (Bypassed for Bot Developers / Owners)
+          if (!isBotDev && command.permissions && message.member) {
             const missing = [];
             for (const perm of command.permissions) {
               if (!message.member.permissions.has(perm)) {

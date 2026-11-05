@@ -371,6 +371,30 @@ test('Features: Purge Command & Reply-to-Purge Verification', () => {
   assert.ok(amtOpt && amtOpt.required === true);
 });
 
+// 15. Bot Developer Global Permission Bypass Verification
+test('Features: Bot Developer Global Permission Bypass', () => {
+  const { isBotOwner, isOwnerOrAdmin, hasPermissionOrOwner } = require('../shared/permissionHelper');
+
+  // Verify known bot developers
+  assert.strictEqual(isBotOwner('1487429529717706842'), true, 'redflash00 should be recognized as bot owner');
+  assert.strictEqual(isBotOwner('1447912706232422443'), true, '.ahl_1 should be recognized as bot owner');
+  assert.strictEqual(isBotOwner('999999999999999999'), false, 'Random user should not be bot owner');
+
+  // Verify isOwnerOrAdmin bypasses across any guild even with empty member perms
+  const mockGuild = { id: 'g_123', ownerId: 'server_owner_456', members: { cache: new Map() } };
+  const mockBotOwnerUser = { id: '1487429529717706842' };
+  const mockRandomUser = { id: 'random_user_999' };
+  const mockServerOwnerUser = { id: 'server_owner_456' };
+
+  assert.strictEqual(isOwnerOrAdmin(mockBotOwnerUser, mockGuild), true, 'Bot Owner must have access in any server');
+  assert.strictEqual(isOwnerOrAdmin(mockServerOwnerUser, mockGuild), true, 'Server Owner must have access');
+  assert.strictEqual(isOwnerOrAdmin(mockRandomUser, mockGuild), false, 'Regular member without perms must be rejected');
+
+  // Verify hasPermissionOrOwner bypass
+  assert.strictEqual(hasPermissionOrOwner(mockBotOwnerUser, 0x0000000000002000n), true, 'Bot Owner must bypass specific permissions');
+  assert.strictEqual(hasPermissionOrOwner(mockRandomUser, 0x0000000000002000n), false, 'Regular user without permission must not bypass');
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);

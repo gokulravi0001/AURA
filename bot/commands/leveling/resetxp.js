@@ -1,12 +1,12 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const UserXP = require('../../../models/UserXP');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('resetxp')
     .setDescription('Reset XP for a specific member or all server members (Admin only)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(opt => opt.setName('user').setDescription('Target member to reset (leave empty for server reset)').setRequired(false))
     .addBooleanOption(opt => opt.setName('server').setDescription('Set to true to reset the entire server').setRequired(false)),
   name: 'resetxp',
@@ -46,7 +46,7 @@ module.exports = {
   },
 
   async executePrefix(message, args, client) {
-    if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
       return message.reply('🚫 Administrator permission required.');
     }
 

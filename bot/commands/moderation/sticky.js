@@ -7,7 +7,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('sticky')
     .setDescription('Manage sticky messages for channels (Admin / Mod only)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addSubcommand(sub =>
       sub.setName('set')
         .setDescription('Set or update a sticky message in this or a designated channel')

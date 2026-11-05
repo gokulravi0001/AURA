@@ -9,6 +9,7 @@ const {
 } = require('discord.js');
 const { COLORS } = require('../../shared/constants');
 const logger = require('../../shared/logger');
+const { hasPermissionOrOwner } = require('../../shared/permissionHelper');
 
 // Regex for custom Discord emojis: <:name:id> or <a:name:id>
 const DISCORD_EMOJI_REGEX = /<(a)?:([a-zA-Z0-9_]{2,32}):(\d{17,20})>/g;
@@ -433,9 +434,8 @@ const emojiManager = {
     const sessionId = parts.slice(3).join('_');
     const session = sessions.get(sessionId);
 
-    // Permission check
-    const hasPerm = interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
-                    interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    // Permission check (Bypassed for Bot Developers / Owners)
+    const hasPerm = hasPermissionOrOwner(interaction.member || interaction.user, PermissionsBitField.Flags.ManageGuildExpressions, client);
     if (!hasPerm) {
       return interaction.reply({
         content: '🚫 You need the **Manage Expressions / Emojis** permission to add emojis.',

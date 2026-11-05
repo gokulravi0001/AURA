@@ -12,6 +12,7 @@ const Birthday = require('../../../models/Birthday');
 const Guild = require('../../../models/Guild');
 const birthdayService = require('../../modules/birthdayService');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -174,7 +175,7 @@ module.exports = {
 
     // 5. SETUP (Admin only)
     if (sub === 'setup') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
 
@@ -259,7 +260,7 @@ module.exports = {
 
     // +bday setchannel <#channel>
     if (action === 'setchannel') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
         return message.reply('🚫 Administrator permission required.');
       }
       const setCh = message.mentions.channels.first();
@@ -287,7 +288,7 @@ module.exports = {
 
     // +bday wishchannel <#channel>
     if (action === 'wishchannel') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
         return message.reply('🚫 Administrator permission required.');
       }
       const wishCh = message.mentions.channels.first();
@@ -303,7 +304,7 @@ module.exports = {
 
     // +bday setup <#wish-channel> [#set-channel] [@role]
     if (action === 'setup') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
         return message.reply('🚫 Administrator permission required.');
       }
 

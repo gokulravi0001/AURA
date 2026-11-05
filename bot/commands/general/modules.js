@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 const guildService = require('../../../shared/guildService');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 const MODULE_DEFINITIONS = [
   { key: 'leveling', name: 'XP & Leveling System', emoji: '🏆', desc: 'Chat XP, member ranks, and role rewards' },
@@ -99,7 +100,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('modules')
     .setDescription('Selectively enable, disable, or manage server features (Admin only)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand(sub =>
       sub.setName('menu')
         .setDescription('Open the interactive features toggle menu with select dropdown & buttons')
@@ -179,7 +179,7 @@ module.exports = {
   permissions: [PermissionFlagsBits.Administrator],
 
   async execute(interaction, client, settings) {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
       return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
     }
 
@@ -257,7 +257,7 @@ module.exports = {
   },
 
   async executePrefix(message, args, client, settings) {
-    if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
       return message.reply('🚫 Administrator permission required.');
     }
 

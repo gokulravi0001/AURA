@@ -1,12 +1,12 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder } = require('discord.js');
 const Guild = require('../../../models/Guild');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('levels')
     .setDescription('Configure leveling options and announcement channels (Admin only)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand(sub =>
       sub.setName('view')
         .setDescription('View current server leveling parameters')
@@ -86,7 +86,7 @@ module.exports = {
     const action = args[0]?.toLowerCase();
     const guildDoc = await Guild.findOne({ guildId: message.guild.id });
 
-    if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
       return message.reply('🚫 Administrator permission required.');
     }
 

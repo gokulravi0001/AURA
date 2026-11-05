@@ -26,6 +26,7 @@ module.exports = {
 
     // Initialize Background Schedulers & Caches
     try {
+      await client.application?.fetch().catch(() => {});
       birthdayService.init(client);
       bumpService.init(client);
       await stickyService.loadCache();

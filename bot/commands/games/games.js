@@ -10,6 +10,7 @@ const {
 const gamesManager = require('../../modules/gamesManager');
 const Guild = require('../../../models/Guild');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -100,7 +101,7 @@ module.exports = {
 
     // 3. COUNTING SETUP
     if (sub === 'counting-setup') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
       const channel = interaction.options.getChannel('channel');
@@ -135,7 +136,7 @@ module.exports = {
 
     // 5. WORD CHAIN SETUP
     if (sub === 'wordchain-setup') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
         return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
       }
       const channel = interaction.options.getChannel('channel');
@@ -186,6 +187,9 @@ module.exports = {
     if (commandUsed === 'counting' || action === 'counting') {
       const guildDoc = await Guild.findOne({ guildId: message.guild.id });
       if (args[1]?.toLowerCase() === 'setup') {
+        if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
+          return message.reply('🚫 Administrator permission required.');
+        }
         const channel = message.mentions.channels.first();
         if (!channel) return message.reply('❌ Usage: `+counting setup #channel`');
         await Guild.updateOne(
@@ -203,6 +207,9 @@ module.exports = {
     if (commandUsed === 'wordchain' || action === 'wordchain') {
       const guildDoc = await Guild.findOne({ guildId: message.guild.id });
       if (args[1]?.toLowerCase() === 'setup') {
+        if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
+          return message.reply('🚫 Administrator permission required.');
+        }
         const channel = message.mentions.channels.first();
         if (!channel) return message.reply('❌ Usage: `+wordchain setup #channel`');
         await Guild.updateOne(

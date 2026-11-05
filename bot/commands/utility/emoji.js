@@ -5,6 +5,7 @@ const {
 } = require('discord.js');
 const emojiManager = require('../../modules/emojiManager');
 const { COLORS } = require('../../../shared/constants');
+const { hasPermissionOrOwner } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -48,9 +49,8 @@ module.exports = {
   module: 'emoji_manager',
 
   async execute(interaction, client, settings) {
-    // 1. Permission checks
-    const hasUserPerm = interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
-                        interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    // 1. Permission checks (Bypassed for Bot Developers / Owners)
+    const hasUserPerm = hasPermissionOrOwner(interaction.member || interaction.user, PermissionsBitField.Flags.ManageGuildExpressions, client);
     if (!hasUserPerm) {
       return interaction.reply({
         content: '🚫 You need the **Manage Expressions / Emojis** permission to use emoji management.',
@@ -159,9 +159,8 @@ module.exports = {
     const invoked = message.content.slice(prefix.length).trim().split(/ +/)[0]?.toLowerCase();
     const action = args[0]?.toLowerCase();
 
-    // Permission checks
-    const hasUserPerm = message.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
-                        message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    // Permission checks (Bypassed for Bot Developers / Owners)
+    const hasUserPerm = hasPermissionOrOwner(message.member || message.author, PermissionsBitField.Flags.ManageGuildExpressions, client);
     if (!hasUserPerm) {
       return message.reply('🚫 You need the **Manage Expressions / Emojis** permission to use emoji management.');
     }
