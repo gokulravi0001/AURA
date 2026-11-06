@@ -4,6 +4,7 @@ const birthdayService = require('../../modules/birthdayService');
 const bumpService = require('../../modules/bumpService');
 const stickyService = require('../../modules/stickyService');
 const inviteService = require('../../modules/inviteService');
+const whitelistService = require('../../../shared/whitelistService');
 
 module.exports = {
   name: 'ready',
@@ -27,6 +28,7 @@ module.exports = {
     // Initialize Background Schedulers & Caches
     try {
       await client.application?.fetch().catch(() => {});
+      await whitelistService.init();
       birthdayService.init(client);
       bumpService.init(client);
       await stickyService.loadCache();

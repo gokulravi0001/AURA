@@ -395,6 +395,48 @@ test('Features: Bot Developer Global Permission Bypass', () => {
   assert.strictEqual(hasPermissionOrOwner(mockRandomUser, 0x0000000000002000n), false, 'Regular user without permission must not bypass');
 });
 
+// 16. Whitelist Command & Permission Bypass Verification
+test('Features: Whitelist Command & Permission Bypass', () => {
+  const whitelistCmd = require('../bot/commands/general/whitelist');
+  const whitelistService = require('../shared/whitelistService');
+  const { isOwnerOrAdmin, hasPermissionOrOwner, canManageWhitelist } = require('../shared/permissionHelper');
+
+  // Verify command metadata
+  assert.strictEqual(whitelistCmd.name, 'whitelist');
+  assert.ok(whitelistCmd.aliases.includes('wl'));
+  const json = whitelistCmd.data.toJSON();
+  assert.strictEqual(json.name, 'whitelist');
+  assert.ok(json.options.find(o => o.name === 'add'));
+  assert.ok(json.options.find(o => o.name === 'remove'));
+  assert.ok(json.options.find(o => o.name === 'list'));
+  assert.ok(json.options.find(o => o.name === 'clear'));
+
+  // Verify canManageWhitelist: Only Server Owner and Bot Owner can manage
+  const mockGuild = { id: 'guild_test_1', ownerId: 'owner_user_1', members: { cache: new Map() } };
+  const botDevUser = { id: '1487429529717706842' };
+  const serverOwnerUser = { id: 'owner_user_1' };
+  const regularUser = { id: 'regular_user_888' };
+  const whitelistedUser = { id: 'whitelisted_user_777' };
+
+  assert.strictEqual(canManageWhitelist(botDevUser, mockGuild), true, 'Bot developer must manage whitelist');
+  assert.strictEqual(canManageWhitelist(serverOwnerUser, mockGuild), true, 'Server owner must manage whitelist');
+  assert.strictEqual(canManageWhitelist(regularUser, mockGuild), false, 'Regular member cannot manage whitelist');
+  assert.strictEqual(canManageWhitelist(whitelistedUser, mockGuild), false, 'Whitelisted member cannot manage whitelist itself');
+
+  // Verify isWhitelisted functionality with settings.whitelist
+  const mockSettings = { whitelist: ['whitelisted_user_777'] };
+  assert.strictEqual(whitelistService.isWhitelisted('whitelisted_user_777', 'guild_test_1', mockSettings), true);
+  assert.strictEqual(whitelistService.isWhitelisted('regular_user_888', 'guild_test_1', mockSettings), false);
+
+  // Verify isOwnerOrAdmin allows whitelisted user even with 0 administrator permissions
+  assert.strictEqual(isOwnerOrAdmin(whitelistedUser, mockGuild, null, mockSettings), true, 'Whitelisted user must pass isOwnerOrAdmin');
+  assert.strictEqual(isOwnerOrAdmin(regularUser, mockGuild, null, mockSettings), false, 'Non-whitelisted user without admin must fail');
+
+  // Verify hasPermissionOrOwner allows whitelisted user
+  assert.strictEqual(hasPermissionOrOwner(whitelistedUser, 0x0000000000002000n, null, mockSettings), true, 'Whitelisted user must pass hasPermissionOrOwner');
+  assert.strictEqual(hasPermissionOrOwner(regularUser, 0x0000000000002000n, null, mockSettings), false, 'Non-whitelisted user must fail');
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);

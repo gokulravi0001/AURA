@@ -69,6 +69,10 @@ function buildHelpEmbed(prefix, client) {
       {
         name: '⚙️ Modular Feature Controls (Turn Features ON/OFF)',
         value: `\`${prefix}modules\` • \`${prefix}modules on <feature|all>\` • \`${prefix}modules off <feature|all>\` • \`${prefix}modules toggle <feature>\`\n*Interactively enable or disable any bot feature selectively with dropdown menus & buttons!*`
+      },
+      {
+        name: '🛡️ Whitelist (Bypass Admin Permissions)',
+        value: `\`${prefix}whitelist add @user\` • \`${prefix}whitelist remove @user\` • \`${prefix}whitelist list\` • \`${prefix}whitelist clear\`\n*Whitelist members so they can run all commands without needing Discord Administrator permissions! (Owner & Bot Dev only)*`
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })

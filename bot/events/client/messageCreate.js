@@ -3,6 +3,7 @@ const logger = require('../../../shared/logger');
 const guildService = require('../../../shared/guildService');
 const { COLORS } = require('../../../shared/constants');
 const { isBotOwner, isOwnerOrAdmin } = require('../../../shared/permissionHelper');
+const whitelistService = require('../../../shared/whitelistService');
 
 // Module handlers
 const levelingService = require('../../modules/levelingService');
@@ -48,9 +49,10 @@ module.exports = {
           const subAction = args[0]?.toLowerCase();
           const isSetupSubcommand = ['setup', 'enable', 'config'].includes(subAction);
           const isBotDev = isBotOwner(message.author.id, client);
-          const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
+          const isWhitelisted = whitelistService.isWhitelisted(message.author.id, message.guild.id, settings);
+          const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client, settings);
 
-          if (command.module && settings && settings.modules && settings.modules[command.module] === false && !isBotDev) {
+          if (command.module && settings && settings.modules && settings.modules[command.module] === false && !isBotDev && !isWhitelisted) {
             if (isSetupSubcommand && isAdmin) {
               settings.modules[command.module] = true;
               const Guild = require('../../../models/Guild');
@@ -71,8 +73,8 @@ module.exports = {
             }
           }
 
-          // Permission check (Bypassed for Bot Developers / Owners)
-          if (!isBotDev && command.permissions && message.member) {
+          // Permission check (Bypassed for Bot Developers / Owners & Whitelisted users)
+          if (!isBotDev && !isWhitelisted && command.permissions && message.member) {
             const missing = [];
             for (const perm of command.permissions) {
               if (!message.member.permissions.has(perm)) {

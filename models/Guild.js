@@ -118,7 +118,9 @@ const GuildSchema = new mongoose.Schema({
     channelId: { type: String, default: null },
     joinMessage: { type: String, default: '👋 Welcome {user} to **{server}**! Invited by **{inviter}** (**{total}** invites) using code `{code}`.' },
     leaveMessage: { type: String, default: '📤 **{user}** left the server. Invited by **{inviter}** (**{total}** invites).' }
-  }
+  },
+
+  whitelist: [{ type: String }]
 }, {
   timestamps: true
 });

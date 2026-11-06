@@ -1,4 +1,5 @@
 const { PermissionsBitField } = require('discord.js');
+const whitelistService = require('./whitelistService');
 
 // Known Bot Developer / Owner Discord IDs (Team Members: redflash00._95995 & .ahl_1)
 const DEFAULT_BOT_OWNERS = [
@@ -42,14 +43,38 @@ function isBotOwner(userId, client = null) {
 }
 
 /**
- * Checks whether a user/member is privileged (Bot Developer, Server Owner, or Administrator).
+ * Checks whether a user/member can manage the server or global whitelist.
+ * ONLY the Bot Developer or Server Owner can manage whitelists.
  *
  * @param {import('discord.js').GuildMember|import('discord.js').User} userOrMember
  * @param {import('discord.js').Guild} guild
  * @param {import('discord.js').Client} [client]
  * @returns {boolean}
  */
-function isOwnerOrAdmin(userOrMember, guild, client = null) {
+function canManageWhitelist(userOrMember, guild, client = null) {
+  if (!userOrMember) return false;
+  const userId = userOrMember.id || userOrMember.user?.id;
+  if (!userId) return false;
+
+  // 1. Bot Developer / Owner
+  if (isBotOwner(userId, client)) return true;
+
+  // 2. Server Owner
+  if (guild && guild.ownerId === userId) return true;
+
+  return false;
+}
+
+/**
+ * Checks whether a user/member is privileged (Bot Developer, Server Owner, Whitelisted, or Administrator).
+ *
+ * @param {import('discord.js').GuildMember|import('discord.js').User} userOrMember
+ * @param {import('discord.js').Guild} guild
+ * @param {import('discord.js').Client} [client]
+ * @param {object} [settings]
+ * @returns {boolean}
+ */
+function isOwnerOrAdmin(userOrMember, guild, client = null, settings = null) {
   if (!userOrMember) return false;
   const userId = userOrMember.id || userOrMember.user?.id;
   if (!userId) return false;
@@ -60,7 +85,10 @@ function isOwnerOrAdmin(userOrMember, guild, client = null) {
   // 2. Server Owner
   if (guild && guild.ownerId === userId) return true;
 
-  // 3. Guild Administrator Permission
+  // 3. Whitelisted Member (Server or Global)
+  if (whitelistService.isWhitelisted(userId, guild?.id, settings)) return true;
+
+  // 4. Guild Administrator Permission
   const member = userOrMember.permissions ? userOrMember : guild?.members?.cache?.get(userId);
   if (member?.permissions?.has(PermissionsBitField.Flags.Administrator)) return true;
 
@@ -68,14 +96,15 @@ function isOwnerOrAdmin(userOrMember, guild, client = null) {
 }
 
 /**
- * Checks whether a member has a specific permission, or has Administrator / Server Owner / Bot Developer bypass.
+ * Checks whether a member has a specific permission, or has Administrator / Server Owner / Bot Developer / Whitelist bypass.
  *
  * @param {import('discord.js').GuildMember|import('discord.js').User} member
  * @param {bigint|string} permission
  * @param {import('discord.js').Client} [client]
+ * @param {object} [settings]
  * @returns {boolean}
  */
-function hasPermissionOrOwner(member, permission, client = null) {
+function hasPermissionOrOwner(member, permission, client = null, settings = null) {
   if (!member) return false;
   const userId = member.id || member.user?.id;
   if (!userId) return false;
@@ -86,10 +115,13 @@ function hasPermissionOrOwner(member, permission, client = null) {
   // 2. Server Owner bypass
   if (member.guild && member.guild.ownerId === userId) return true;
 
-  // 3. Guild Administrator bypass
+  // 3. Whitelisted Member bypass
+  if (whitelistService.isWhitelisted(userId, member?.guild?.id, settings)) return true;
+
+  // 4. Guild Administrator bypass
   if (member.permissions?.has(PermissionsBitField.Flags.Administrator)) return true;
 
-  // 4. Specific Permission check
+  // 5. Specific Permission check
   if (permission && member.permissions?.has(permission)) return true;
 
   return false;
@@ -99,5 +131,6 @@ module.exports = {
   isBotOwner,
   isOwnerOrAdmin,
   hasPermissionOrOwner,
+  canManageWhitelist,
   DEFAULT_BOT_OWNERS
 };

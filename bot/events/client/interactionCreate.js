@@ -3,6 +3,7 @@ const logger = require('../../../shared/logger');
 const guildService = require('../../../shared/guildService');
 const { COLORS } = require('../../../shared/constants');
 const { isBotOwner, isOwnerOrAdmin } = require('../../../shared/permissionHelper');
+const whitelistService = require('../../../shared/whitelistService');
 
 module.exports = {
   name: 'interactionCreate',
@@ -29,9 +30,10 @@ module.exports = {
 
         const isSetupSubcommand = ['setup', 'enable', 'config'].includes(sub);
         const isBotDev = isBotOwner(interaction.user.id, client);
-        const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
+        const isWhitelisted = whitelistService.isWhitelisted(interaction.user.id, interaction.guildId, settings);
+        const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client, settings);
 
-        if (command.module && settings && settings.modules && settings.modules[command.module] === false && !isBotDev) {
+        if (command.module && settings && settings.modules && settings.modules[command.module] === false && !isBotDev && !isWhitelisted) {
           if (isSetupSubcommand && isAdmin) {
             // Auto re-enable module when administrator configures or runs it
             settings.modules[command.module] = true;
@@ -54,8 +56,8 @@ module.exports = {
           }
         }
 
-        // Permission check (Bypassed for Bot Developers / Owners)
-        if (!isBotDev && command.permissions && interaction.member) {
+        // Permission check (Bypassed for Bot Developers / Owners & Whitelisted users)
+        if (!isBotDev && !isWhitelisted && command.permissions && interaction.member) {
           const missing = [];
           for (const perm of command.permissions) {
             if (!interaction.member.permissions.has(perm)) {

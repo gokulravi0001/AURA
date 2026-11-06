@@ -1,5 +1,6 @@
 const Guild = require('../models/Guild');
 const logger = require('./logger');
+const whitelistService = require('./whitelistService');
 
 // In-memory cache for fast lookups
 const guildCache = new Map();
@@ -24,6 +25,10 @@ const guildService = {
         logger.info(`Created default configuration for Guild: ${guildId}`);
       }
 
+      if (guild?.whitelist) {
+        whitelistService.syncGuildCache(guildId, guild.whitelist);
+      }
+
       guildCache.set(guildId, {
         timestamp: Date.now(),
         data: guild
@@ -46,6 +51,10 @@ const guildService = {
         { $set: updateData },
         { new: true, upsert: true }
       );
+
+      if (updated?.whitelist) {
+        whitelistService.syncGuildCache(guildId, updated.whitelist);
+      }
 
       guildCache.set(guildId, {
         timestamp: Date.now(),
