@@ -46,7 +46,7 @@ export default function Leveling() {
       });
       setToast('Leveling settings saved successfully!');
     } catch (err) {
-      setToast('Failed to save settings.');
+      setToast(err.response?.data?.error || 'Failed to save settings.');
     } finally {
       setSaving(false);
       setTimeout(() => setToast(null), 3000);

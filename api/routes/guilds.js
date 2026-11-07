@@ -57,14 +57,15 @@ router.get('/:guildId/overview', async (req, res) => {
     },
     settings,
     topXp,
-    statsHistory
+    statsHistory,
+    canManage: !!req.canManage
   });
 });
 
 // 2. GET /api/guilds/:guildId/settings
 router.get('/:guildId/settings', async (req, res) => {
   const settings = await guildService.getSettings(req.params.guildId);
-  res.json({ settings });
+  res.json({ settings, canManage: !!req.canManage });
 });
 
 // 3. PATCH /api/guilds/:guildId/settings - Update settings

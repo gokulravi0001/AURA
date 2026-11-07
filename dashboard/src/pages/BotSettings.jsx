@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../api';
-import { Settings, Save, CheckCircle2 } from 'lucide-react';
+import { Settings, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function BotSettings() {
   const { guildId } = useParams();
@@ -21,12 +21,12 @@ export default function BotSettings() {
       await api.patch(`/api/guilds/${guildId}/settings`, {
         prefix: settings.prefix
       });
-      setToast('Bot settings saved successfully!');
+      setToast({ type: 'success', text: 'Bot settings saved successfully!' });
     } catch (err) {
-      setToast('Failed to save settings.');
+      setToast({ type: 'error', text: err.response?.data?.error || 'Failed to save settings.' });
     } finally {
       setSaving(false);
-      setTimeout(() => setToast(null), 3000);
+      setTimeout(() => setToast(null), 3500);
     }
   };
 
@@ -62,9 +62,13 @@ export default function BotSettings() {
       </div>
 
       {toast && (
-        <div className="p-3 rounded-xl bg-green-500/20 border border-green-500/30 text-green-300 text-sm flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
-          {toast}
+        <div className={`p-3 rounded-xl border text-sm flex items-center gap-2 ${
+          toast.type === 'success'
+            ? 'bg-green-500/20 border-green-500/30 text-green-300'
+            : 'bg-red-500/20 border-red-500/30 text-red-300'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+          {toast.text}
         </div>
       )}
 

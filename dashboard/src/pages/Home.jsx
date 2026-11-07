@@ -93,22 +93,30 @@ export default function Home() {
         </p>
 
         <div className="flex flex-wrap justify-center gap-4 pt-4">
-          {user ? (
-            <Link
-              to="/servers"
-              className="px-8 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-aura-purple to-aura-red hover:opacity-95 shadow-purple-glow transition flex items-center gap-2 text-base"
-            >
-              Open Dashboard
-              <ChevronRight className="w-5 h-5" />
-            </Link>
-          ) : (
+          <Link
+            to="/servers"
+            className="px-8 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-aura-purple to-aura-red hover:opacity-95 shadow-purple-glow transition flex items-center gap-2 text-base"
+          >
+            Explore Dashboard
+            <ChevronRight className="w-5 h-5" />
+          </Link>
+
+          {!user ? (
             <a
               href={loginUrl}
-              className="px-8 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-aura-purple to-aura-red hover:opacity-95 shadow-purple-glow transition flex items-center gap-2 text-base"
+              className="px-8 py-3.5 rounded-xl font-bold text-white bg-aura-card border border-aura-border hover:border-aura-purple transition flex items-center gap-2 text-base"
             >
-              <Sparkles className="w-5 h-5" />
+              <Sparkles className="w-5 h-5 text-aura-purpleLight" />
               Sign in with Discord
             </a>
+          ) : (
+            <Link
+              to="/servers"
+              className="px-8 py-3.5 rounded-xl font-bold text-white bg-aura-card border border-aura-border hover:border-aura-purple transition flex items-center gap-2 text-base"
+            >
+              <ShieldCheck className="w-5 h-5 text-aura-purpleLight" />
+              Manage Servers
+            </Link>
           )}
 
           <a

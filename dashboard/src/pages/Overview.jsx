@@ -10,7 +10,8 @@ import {
   Award,
   Layers,
   ArrowUpRight,
-  Sparkles
+  Sparkles,
+  ShieldAlert
 } from 'lucide-react';
 import {
   AreaChart,
@@ -89,11 +90,29 @@ export default function Overview() {
               className="px-5 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-aura-purple to-aura-red hover:opacity-95 text-white transition flex items-center gap-2 shadow-purple-glow"
             >
               <Layers className="w-4 h-4" />
-              Configure Modules
+              {data?.canManage ? 'Configure Modules' : 'View Modules'}
             </Link>
           </div>
         </div>
       </div>
+
+      {/* Guest Mode Notification */}
+      {data && !data.canManage && (
+        <div className="p-4 rounded-2xl bg-aura-card border border-aura-purple/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-aura-textMuted shadow-purple-glow">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-aura-purple/20 flex items-center justify-center text-aura-purpleLight shrink-0">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+            <span>You are exploring <strong>{guild?.name}</strong> in public guest mode. Sign in to edit server settings.</span>
+          </div>
+          <a
+            href={`${import.meta.env.VITE_API_URL || ''}/api/auth/login`}
+            className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-aura-purple to-aura-red hover:opacity-90 transition shrink-0 text-center"
+          >
+            Sign in with Discord
+          </a>
+        </div>
+      )}
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

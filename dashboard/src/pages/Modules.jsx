@@ -12,23 +12,37 @@ import {
   MessageSquareShare,
   BarChart3,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ShieldAlert
 } from 'lucide-react';
 
 export default function Modules() {
   const { guildId } = useParams();
   const [settings, setSettings] = useState(null);
+  const [canManage, setCanManage] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
     api.get(`/api/guilds/${guildId}/settings`)
-      .then(res => setSettings(res.data.settings))
+      .then(res => {
+        setSettings(res.data.settings);
+        setCanManage(res.data.canManage ?? true);
+      })
       .catch(err => console.error(err));
   }, [guildId]);
 
   const toggleModule = async (moduleKey) => {
     if (!settings) return;
+
+    if (!canManage) {
+      setToast({
+        type: 'error',
+        text: 'Viewing in read-only mode. Sign in with an authorized account to toggle modules.'
+      });
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
 
     const updatedModules = {
       ...settings.modules,
@@ -47,7 +61,7 @@ export default function Modules() {
       });
       setToast({ type: 'success', text: `Module ${moduleKey} updated successfully!` });
     } catch (err) {
-      setToast({ type: 'error', text: 'Failed to update module.' });
+      setToast({ type: 'error', text: err.response?.data?.error || 'Failed to update module.' });
     } finally {
       setSaving(false);
       setTimeout(() => setToast(null), 3000);
@@ -93,6 +107,23 @@ export default function Modules() {
           </div>
         )}
       </div>
+
+      {!canManage && (
+        <div className="p-4 rounded-2xl bg-aura-card border border-aura-purple/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-aura-textMuted shadow-purple-glow">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-aura-purple/20 flex items-center justify-center text-aura-purpleLight shrink-0">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+            <span>Viewing in public read-only mode. Only administrators, server owners, or whitelisted members can toggle modules.</span>
+          </div>
+          <a
+            href={`${import.meta.env.VITE_API_URL || ''}/api/auth/login`}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-aura-purple to-aura-red hover:opacity-90 transition shrink-0 text-center"
+          >
+            Sign in with Discord
+          </a>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {moduleDefinitions.map((mod) => {
