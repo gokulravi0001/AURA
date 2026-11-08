@@ -128,7 +128,12 @@ const GuildSchema = new mongoose.Schema({
     logChannelId: { type: String, default: null }
   },
 
-  whitelist: [{ type: String }]
+  whitelist: [{ type: String }],
+
+  immunity: {
+    users: [{ type: String }],
+    roles: [{ type: String }]
+  }
 }, {
   timestamps: true
 });

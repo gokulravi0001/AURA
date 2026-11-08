@@ -452,6 +452,55 @@ test('Features: Whitelist Command & Permission Bypass', () => {
   assert.strictEqual(hasPermissionOrOwner(regularUser, 0x0000000000002000n, null, mockSettings), false, 'Non-whitelisted user must fail');
 });
 
+// 20. Immunity System Verification
+test('Features: Immunity System & VC Command Protection', () => {
+  const immunityCmd = require('../bot/commands/general/immunity');
+  const immunityService = require('../shared/immunityService');
+
+  // Verify command metadata
+  assert.strictEqual(immunityCmd.name, 'immunity');
+  assert.ok(immunityCmd.aliases.includes('imunity'));
+  assert.ok(immunityCmd.aliases.includes('immune'));
+  const json = immunityCmd.data.toJSON();
+  assert.strictEqual(json.name, 'immunity');
+  assert.ok(json.options.find(o => o.name === 'add'));
+  assert.ok(json.options.find(o => o.name === 'remove'));
+  assert.ok(json.options.find(o => o.name === 'role'));
+  assert.ok(json.options.find(o => o.name === 'list'));
+  assert.ok(json.options.find(o => o.name === 'clear'));
+
+  // Verify User ID 1487429529717706842 has permanent absolute immunity
+  assert.strictEqual(immunityService.isImmune('1487429529717706842'), true, 'User 1487429529717706842 must have permanent absolute immunity');
+  assert.strictEqual(immunityService.isImmune({ id: '1487429529717706842' }), true, 'User object with 1487429529717706842 must be immune');
+
+  // Verify other bot owners are immune
+  assert.strictEqual(immunityService.isImmune('1447912706232422443'), true, 'Developer 1447912706232422443 must have immunity');
+
+  // Verify guild owner is immune in their own guild
+  const mockGuild = { id: 'guild_im_1', ownerId: 'guild_owner_999', members: { cache: new Map() } };
+  assert.strictEqual(immunityService.isImmune('guild_owner_999', mockGuild), true, 'Guild owner must have immunity in their guild');
+
+  // Verify regular user is not immune
+  assert.strictEqual(immunityService.isImmune('random_user_555', mockGuild), false, 'Regular member must not be immune by default');
+
+  // Verify server-configured immune user via settings
+  const immuneSettings = { immunity: { users: ['immune_vip_123'], roles: ['immune_role_456'] } };
+  assert.strictEqual(immunityService.isImmune('immune_vip_123', mockGuild, null, immuneSettings), true, 'User in settings.immunity.users must be immune');
+  assert.strictEqual(immunityService.isImmune('random_user_555', mockGuild, null, immuneSettings), false, 'User not in settings must not be immune');
+
+  // Verify role immunity
+  const mockMemberWithRole = {
+    id: 'role_member_777',
+    roles: { cache: new Map([['immune_role_456', { id: 'immune_role_456' }]]) }
+  };
+  const mockMemberWithoutRole = {
+    id: 'no_role_member_888',
+    roles: { cache: new Map([['other_role_999', { id: 'other_role_999' }]]) }
+  };
+  assert.strictEqual(immunityService.isImmune(mockMemberWithRole, mockGuild, null, immuneSettings), true, 'Member with immune role must be immune');
+  assert.strictEqual(immunityService.isImmune(mockMemberWithoutRole, mockGuild, null, immuneSettings), false, 'Member without immune role must not be immune');
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);

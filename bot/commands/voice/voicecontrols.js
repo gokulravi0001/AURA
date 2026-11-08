@@ -10,6 +10,7 @@ const guildService = require('../../../shared/guildService');
 const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const bounceManager = require('../../modules/bounceManager');
+const immunityService = require('../../../shared/immunityService');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -306,9 +307,19 @@ module.exports = {
         return interaction.reply({ content: '❌ The selected channel must be a voice or stage channel!', ephemeral: true });
       }
 
-      const membersToDisconnect = [...targetChannel.members.values()];
-      if (membersToDisconnect.length === 0) {
+      const allChannelMembers = [...targetChannel.members.values()];
+      if (allChannelMembers.length === 0) {
         return interaction.reply({ content: `⚠️ No members are currently connected to <#${targetChannel.id}>.`, ephemeral: true });
+      }
+
+      const immuneCount = allChannelMembers.filter(m => immunityService.isImmune(m, guild, client, settings)).length;
+      const membersToDisconnect = allChannelMembers.filter(m => !immunityService.isImmune(m, guild, client, settings));
+
+      if (membersToDisconnect.length === 0 && immuneCount > 0) {
+        return interaction.reply({
+          content: `🛡️ All connected members in <#${targetChannel.id}> possess **Immunity** and cannot be disconnected.`,
+          ephemeral: true
+        });
       }
 
       await interaction.deferReply();
@@ -330,6 +341,7 @@ module.exports = {
         .setTitle('🔌 Mass Disconnect Completed!')
         .setDescription(
           `Successfully disconnected **${successCount}** member${successCount === 1 ? '' : 's'} from <#${targetChannel.id}>!` +
+          (immuneCount > 0 ? `\n🛡️ *${immuneCount} immune member(s) were protected and skipped.*` : '') +
           (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be disconnected (missing permissions or already left).*` : '')
         )
         .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
@@ -379,12 +391,20 @@ module.exports = {
         return interaction.reply({ content: `⚠️ No members are currently connected to <#${targetChannel.id}>.`, ephemeral: true });
       }
 
+      const immuneMuteCount = isMute ? channelMembers.filter(m => immunityService.isImmune(m, guild, client, settings)).length : 0;
       const membersToProcess = channelMembers.filter(m => {
         if (m.id === client.user.id) return false;
+        if (isMute && immunityService.isImmune(m, guild, client, settings)) return false;
         return isMute ? !m.voice.serverMute : m.voice.serverMute;
       });
 
       if (membersToProcess.length === 0) {
+        if (isMute && immuneMuteCount > 0) {
+          return interaction.reply({
+            content: `🛡️ All unmuted members in <#${targetChannel.id}> possess **Immunity** and cannot be server muted.`,
+            ephemeral: true
+          });
+        }
         return interaction.reply({
           content: `⚠️ All members in <#${targetChannel.id}> are already ${isMute ? 'server muted' : 'server unmuted'}.`,
           ephemeral: true
@@ -410,6 +430,7 @@ module.exports = {
         .setTitle(isMute ? '🔇 Mass Server Mute Completed!' : '🔊 Mass Server Unmute Completed!')
         .setDescription(
           `Successfully ${isMute ? 'server muted' : 'server unmuted'} **${successCount}** member${successCount === 1 ? '' : 's'} in <#${targetChannel.id}>!` +
+          (immuneMuteCount > 0 ? `\n🛡️ *${immuneMuteCount} immune member(s) were protected and skipped.*` : '') +
           (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be ${isMute ? 'muted' : 'unmuted'} (missing permissions or higher role).*` : '')
         )
         .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
@@ -448,6 +469,13 @@ module.exports = {
 
       if (targetMember.id === client.user.id) {
         return interaction.reply({ content: '❌ I cannot bounce myself!', ephemeral: true });
+      }
+
+      if (immunityService.isImmune(targetMember, guild, client, settings)) {
+        return interaction.reply({
+          content: `🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command.`,
+          ephemeral: true
+        });
       }
 
       const currentVoice = guild.voiceStates.cache.get(targetMember.id);
@@ -795,9 +823,16 @@ module.exports = {
         );
       }
 
-      const membersToDisconnect = [...targetChannel.members.values()];
-      if (membersToDisconnect.length === 0) {
+      const allMembers = [...targetChannel.members.values()];
+      if (allMembers.length === 0) {
         return message.reply(`⚠️ No members are currently connected to <#${targetChannel.id}>.`);
+      }
+
+      const immuneCount = allMembers.filter(m => immunityService.isImmune(m, guild, client, settings)).length;
+      const membersToDisconnect = allMembers.filter(m => !immunityService.isImmune(m, guild, client, settings));
+
+      if (membersToDisconnect.length === 0 && immuneCount > 0) {
+        return message.reply(`🛡️ All connected members in <#${targetChannel.id}> possess **Immunity** and cannot be disconnected.`);
       }
 
       let successCount = 0;
@@ -811,6 +846,17 @@ module.exports = {
           failCount++;
         }
       }
+
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.ERROR)
+        .setTitle('🔌 Mass Disconnect Completed!')
+        .setDescription(
+          `Successfully disconnected **${successCount}** member${successCount === 1 ? '' : 's'} from <#${targetChannel.id}>!` +
+          (immuneCount > 0 ? `\n🛡️ *${immuneCount} immune member(s) were protected and skipped.*` : '') +
+          (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be disconnected (missing permissions or already left).*` : '')
+        )
+        .setFooter({ text: `Requested by ${message.author.username}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
+        .setTimestamp();
 
       return message.reply({ embeds: [embed] });
     }
@@ -863,12 +909,17 @@ module.exports = {
         return message.reply(`⚠️ No members are currently connected to <#${targetChannel.id}>.`);
       }
 
+      const immuneMuteCount = isMute ? channelMembers.filter(m => immunityService.isImmune(m, guild, client, settings)).length : 0;
       const membersToProcess = channelMembers.filter(m => {
         if (m.id === client.user.id) return false;
+        if (isMute && immunityService.isImmune(m, guild, client, settings)) return false;
         return isMute ? !m.voice.serverMute : m.voice.serverMute;
       });
 
       if (membersToProcess.length === 0) {
+        if (isMute && immuneMuteCount > 0) {
+          return message.reply(`🛡️ All unmuted members in <#${targetChannel.id}> possess **Immunity** and cannot be server muted.`);
+        }
         return message.reply(`⚠️ All members in <#${targetChannel.id}> are already ${isMute ? 'server muted' : 'server unmuted'}.`);
       }
 
@@ -889,6 +940,7 @@ module.exports = {
         .setTitle(isMute ? '🔇 Mass Server Mute Completed!' : '🔊 Mass Server Unmute Completed!')
         .setDescription(
           `Successfully ${isMute ? 'server muted' : 'server unmuted'} **${successCount}** member${successCount === 1 ? '' : 's'} in <#${targetChannel.id}>!` +
+          (immuneMuteCount > 0 ? `\n🛡️ *${immuneMuteCount} immune member(s) were protected and skipped.*` : '') +
           (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be ${isMute ? 'muted' : 'unmuted'} (missing permissions or higher role).*` : '')
         )
         .setFooter({ text: `Requested by ${message.author.username}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
@@ -947,6 +999,10 @@ module.exports = {
 
       if (targetMember.id === client.user.id) {
         return message.reply('❌ I cannot bounce myself!');
+      }
+
+      if (immunityService.isImmune(targetMember, guild, client, settings)) {
+        return message.reply(`🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command.`);
       }
 
       const currentVoice = guild.voiceStates.cache.get(targetMember.id);

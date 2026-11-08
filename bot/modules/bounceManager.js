@@ -5,6 +5,7 @@ const {
 } = require('discord.js');
 const logger = require('../../shared/logger');
 const { COLORS } = require('../../shared/constants');
+const immunityService = require('../../shared/immunityService');
 
 // Shared Map of active bounces across all command entry points: userId -> State
 const activeBounces = new Map();
@@ -104,6 +105,14 @@ const bounceManager = {
 
     if (activeBounces.has(targetMember.id)) {
       return { success: false, error: 'Target member is already in an active voice bounce tour.' };
+    }
+
+    // Check Immunity
+    if (immunityService.isImmune(targetMember, guild)) {
+      return {
+        success: false,
+        error: `🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command.`
+      };
     }
 
     // Check voice connection

@@ -6,6 +6,7 @@ const {
 const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const bounceManager = require('../../modules/bounceManager');
+const immunityService = require('../../../shared/immunityService');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -77,6 +78,13 @@ module.exports = {
 
     if (targetMember.id === client.user.id) {
       return interaction.reply({ content: '❌ I cannot bounce myself!', ephemeral: true });
+    }
+
+    if (immunityService.isImmune(targetMember, guild, client, settings)) {
+      return interaction.reply({
+        content: `🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command.`,
+        ephemeral: true
+      });
     }
 
     const currentVoice = guild.voiceStates.cache.get(targetMember.id);
@@ -176,6 +184,10 @@ module.exports = {
 
     if (targetMember.id === client.user.id) {
       return message.reply('❌ I cannot bounce myself!');
+    }
+
+    if (immunityService.isImmune(targetMember, guild, client, settings)) {
+      return message.reply(`🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command.`);
     }
 
     const currentVoice = guild.voiceStates.cache.get(targetMember.id);
