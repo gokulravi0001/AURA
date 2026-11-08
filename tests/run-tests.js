@@ -290,6 +290,8 @@ test('Features: Voice Controls & Mass Actions (Move, DC, Mute, Unmute) Command',
   assert.ok(targetOpt && targetOpt.required === true);
   const roundsOpt = bounceSub.options.find(opt => opt.name === 'rounds');
   assert.ok(roundsOpt && roundsOpt.min_value === 1 && roundsOpt.max_value === 100);
+  const countOpt = bounceSub.options.find(opt => opt.name === 'count');
+  assert.ok(countOpt && countOpt.min_value === 1 && countOpt.max_value === 100);
 
   // Top-level bounce command check
   const bounceCmd = require('../bot/commands/voice/bounce');
@@ -297,6 +299,19 @@ test('Features: Voice Controls & Mass Actions (Move, DC, Mute, Unmute) Command',
   assert.strictEqual(bounceJson.name, 'bounce');
   const topRounds = bounceJson.options.find(o => o.name === 'rounds');
   assert.ok(topRounds && topRounds.min_value === 1 && topRounds.max_value === 100);
+  const topCount = bounceJson.options.find(o => o.name === 'count');
+  assert.ok(topCount && topCount.min_value === 1 && topCount.max_value === 100);
+
+  // Bounce Manager parsing tests
+  const bounceManager = require('../bot/modules/bounceManager');
+  assert.strictEqual(bounceManager.parseRounds(['10']), 10);
+  assert.strictEqual(bounceManager.parseRounds(['100']), 100);
+  assert.strictEqual(bounceManager.parseRounds(['count', '10']), 10);
+  assert.strictEqual(bounceManager.parseRounds(['count:100']), 100);
+  assert.strictEqual(bounceManager.parseRounds(['rounds=50']), 50);
+  assert.strictEqual(bounceManager.parseRounds(['<@123456789012345678>', '10']), 10);
+  assert.strictEqual(bounceManager.parseRounds(['<@123456789012345678>', 'count:100']), 100);
+  assert.strictEqual(bounceManager.parseRounds(['<@123456789012345678>', '250']), 100); // capped at 100
 });
 
 // 13. Emoji Manager & Selective / Mass Add Verification

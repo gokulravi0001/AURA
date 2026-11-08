@@ -1,14 +1,11 @@
 const {
   SlashCommandBuilder,
   PermissionsBitField,
-  ChannelType,
   EmbedBuilder
 } = require('discord.js');
 const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
-
-// Map to manage active bounce operations: userId -> { cancel: boolean }
-const activeBounces = new Map();
+const bounceManager = require('../../modules/bounceManager');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -26,9 +23,21 @@ module.exports = {
         .setMaxValue(100)
         .setRequired(false)
     )
+    .addIntegerOption(opt =>
+      opt.setName('count')
+        .setDescription('Alias for rounds: number of rounds to tour (1-100, default: 1)')
+        .setMinValue(1)
+        .setMaxValue(100)
+        .setRequired(false)
+    )
     .addBooleanOption(opt =>
       opt.setName('return_to_start')
         .setDescription('Return member to their starting channel when finished (default: true)')
+        .setRequired(false)
+    )
+    .addBooleanOption(opt =>
+      opt.setName('stop')
+        .setDescription('Stop an active voice bounce for this member')
         .setRequired(false)
     ),
 
@@ -56,12 +65,22 @@ module.exports = {
       return interaction.reply({ content: '❌ Target member not found in this server.', ephemeral: true });
     }
 
+    // Stop option: /bounce target:@user stop:true
+    const isStop = interaction.options.getBoolean('stop');
+    if (isStop) {
+      if (bounceManager.isBouncing(targetMember.id)) {
+        bounceManager.stopBounce(targetMember.id);
+        return interaction.reply({ content: `🛑 Stopping voice bounce for <@${targetMember.id}>...` });
+      }
+      return interaction.reply({ content: `⚠️ No active voice bounce found for <@${targetMember.id}>.`, ephemeral: true });
+    }
+
     if (targetMember.id === client.user.id) {
       return interaction.reply({ content: '❌ I cannot bounce myself!', ephemeral: true });
     }
 
-    const startChannel = targetMember.voice?.channel;
-    if (!startChannel) {
+    const currentVoice = guild.voiceStates.cache.get(targetMember.id);
+    if (!currentVoice?.channelId) {
       return interaction.reply({ content: `❌ <@${targetMember.id}> is not currently connected to any voice channel.`, ephemeral: true });
     }
 
@@ -71,72 +90,43 @@ module.exports = {
       return interaction.reply({ content: '🚫 I cannot move this member due to role hierarchy.', ephemeral: true });
     }
 
-    if (activeBounces.has(targetMember.id)) {
-      return interaction.reply({ content: `⚠️ <@${targetMember.id}> is already in an active voice bounce tour.`, ephemeral: true });
+    if (bounceManager.isBouncing(targetMember.id)) {
+      return interaction.reply({ content: `⚠️ <@${targetMember.id}> is already in an active voice bounce tour. Use \`/bounce target:@member stop:true\` to stop it.`, ephemeral: true });
     }
 
-    const rounds = Math.min(100, Math.max(1, interaction.options.getInteger('rounds') || 1));
+    const rawRounds = interaction.options.getInteger('rounds') || interaction.options.getInteger('count') || 1;
+    const rounds = Math.min(100, Math.max(1, rawRounds));
     const returnToStart = interaction.options.getBoolean('return_to_start') !== false;
 
-    const candidateChannels = [...guild.channels.cache.values()]
-      .filter(c =>
-        c.isVoiceBased() &&
-        c.type === ChannelType.GuildVoice &&
-        c.id !== startChannel.id &&
-        botMember.permissionsIn(c).has(PermissionsBitField.Flags.Connect) &&
-        botMember.permissionsIn(c).has(PermissionsBitField.Flags.MoveMembers)
-      )
-      .sort((a, b) => a.rawPosition - b.rawPosition);
-
-    if (candidateChannels.length === 0) {
-      return interaction.reply({ content: `❌ There are no other available voice channels to bounce <@${targetMember.id}> to.`, ephemeral: true });
-    }
-
-    const tourChannels = candidateChannels.slice(0, 15);
-
     await interaction.reply({
-      content: `🌀 **Starting Voice Bounce for <@${targetMember.id}>!**\nTouring across **${tourChannels.length}** voice channels for **${rounds}** round${rounds === 1 ? '' : 's'}...`
+      content: `🌀 **Starting Voice Bounce for <@${targetMember.id}>!**\nTarget: **${rounds}** round${rounds === 1 ? '' : 's'} *(Round 1/${rounds} starting)*...`
     });
 
-    const state = { cancel: false };
-    activeBounces.set(targetMember.id, state);
-
-    let movedCount = 0;
-    let completedRounds = 0;
-
-    for (let r = 1; r <= rounds; r++) {
-      let roundFinished = true;
-      for (const ch of tourChannels) {
-        if (!targetMember.voice?.channel || state.cancel) {
-          roundFinished = false;
-          break;
-        }
-
-        try {
-          await targetMember.voice.setChannel(ch.id, `Voice bounce round ${r}/${rounds} initiated by ${interaction.user.tag}`);
-          movedCount++;
-        } catch (_) {}
-
-        await new Promise(res => setTimeout(res, 750));
+    const result = await bounceManager.startBounce({
+      guild,
+      targetMember,
+      botMember,
+      rounds,
+      returnToStart,
+      initiatorTag: interaction.user.tag,
+      onProgress: async (completed, total, moved) => {
+        await interaction.editReply({
+          content: `🌀 **Voice Bounce in progress for <@${targetMember.id}>...**\nCompleted **${completed}/${total}** rounds (**${moved}** moves, ${Math.round((completed / total) * 100)}%)...`
+        }).catch(() => {});
       }
+    });
 
-      if (!targetMember.voice?.channel || state.cancel) break;
-      if (roundFinished) completedRounds++;
+    if (!result.success) {
+      return interaction.editReply({ content: result.error || 'Failed to start voice bounce.' });
     }
-
-    if (returnToStart && targetMember.voice?.channel) {
-      await targetMember.voice.setChannel(startChannel.id).catch(() => {});
-    }
-
-    activeBounces.delete(targetMember.id);
 
     const embed = new EmbedBuilder()
       .setColor(COLORS.PRIMARY)
       .setTitle('🌀 Voice Bounce Completed!')
       .setDescription(
-        `Successfully moved <@${targetMember.id}> across **${movedCount}** voice channel${movedCount === 1 ? '' : 's'} over **${completedRounds}/${rounds}** round${rounds === 1 ? '' : 's'} in **${(movedCount * 0.75).toFixed(1)}** seconds!` +
-        (returnToStart ? `\nReturned back to <#${startChannel.id}>.` : '') +
-        (state.cancel ? '\n⚠️ *Operation was stopped early.*' : '')
+        `Successfully moved <@${targetMember.id}> across **${result.movedCount}** voice channels over **${result.completedRounds}/${rounds}** round${rounds === 1 ? '' : 's'} in **${(result.movedCount * 0.8).toFixed(1)}** seconds!` +
+        (returnToStart ? `\nReturned back to <#${result.startChannelId}>.` : '') +
+        (result.canceled ? '\n⚠️ *Operation was stopped early.*' : '')
       )
       .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
       .setTimestamp();
@@ -167,9 +157,8 @@ module.exports = {
     }
 
     if (isStop) {
-      if (targetMember && activeBounces.has(targetMember.id)) {
-        const state = activeBounces.get(targetMember.id);
-        state.cancel = true;
+      if (targetMember && bounceManager.isBouncing(targetMember.id)) {
+        bounceManager.stopBounce(targetMember.id);
         return message.reply(`🛑 Stopping voice bounce for <@${targetMember.id}>...`);
       }
       return message.reply('⚠️ No active voice bounce found for that member.');
@@ -179,9 +168,9 @@ module.exports = {
       return message.reply(
         '❌ Please specify the member to bounce across voice channels!\n' +
         '• **Usage:** `+bounce @member [rounds]`\n' +
-        '• **Example:** `+bounce @member 5` *(tours 5 rounds, max 100)*\n' +
+        '• **Examples:** `+bounce @member 10` or `+bounce @member count:100`\n' +
         '• **Stop Tour:** `+bounce stop @member`\n' +
-        '• **Don\'t return:** `+bounce @member 5 false`'
+        '• **Don\'t return:** `+bounce @member 10 false`'
       );
     }
 
@@ -189,8 +178,8 @@ module.exports = {
       return message.reply('❌ I cannot bounce myself!');
     }
 
-    const startChannel = targetMember.voice?.channel;
-    if (!startChannel) {
+    const currentVoice = guild.voiceStates.cache.get(targetMember.id);
+    if (!currentVoice?.channelId) {
       return message.reply(`❌ <@${targetMember.id}> is not currently connected to any voice channel.`);
     }
 
@@ -201,82 +190,45 @@ module.exports = {
       return message.reply('🚫 I cannot move this member due to role hierarchy.');
     }
 
-    if (activeBounces.has(targetMember.id)) {
+    if (bounceManager.isBouncing(targetMember.id)) {
       return message.reply(`⚠️ <@${targetMember.id}> is already in an active voice bounce tour. Use \`+bounce stop @member\` to stop it.`);
     }
 
-    // Parse rounds (1 - 100)
-    let rounds = 1;
-    for (const a of args) {
-      const parsed = parseInt(a, 10);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
-        rounds = Math.min(100, Math.max(1, parsed));
-        break;
-      }
-    }
-
+    // Parse rounds accurately (supports 10, count 10, count:10, rounds:100, etc.)
+    const rounds = bounceManager.parseRounds(args);
     const returnToStart = !args.some(a => ['false', 'no', '0'].includes(a.toLowerCase()));
-
-    const candidateChannels = [...guild.channels.cache.values()]
-      .filter(c =>
-        c.isVoiceBased() &&
-        c.type === ChannelType.GuildVoice &&
-        c.id !== startChannel.id &&
-        botMember.permissionsIn(c).has(PermissionsBitField.Flags.Connect) &&
-        botMember.permissionsIn(c).has(PermissionsBitField.Flags.MoveMembers)
-      )
-      .sort((a, b) => a.rawPosition - b.rawPosition);
-
-    if (candidateChannels.length === 0) {
-      return message.reply(`❌ There are no other available voice channels to bounce <@${targetMember.id}> to.`);
-    }
-
-    const tourChannels = candidateChannels.slice(0, 15);
-
-    const state = { cancel: false };
-    activeBounces.set(targetMember.id, state);
 
     const startMsg = await message.reply(
       `🌀 **Starting Voice Bounce for <@${targetMember.id}>!**\n` +
-      `Touring through **${tourChannels.length}** voice channels for **${rounds}** round${rounds === 1 ? '' : 's'}... *(Type \`+bounce stop @member\` to cancel)*`
+      `Target: **${rounds}** round${rounds === 1 ? '' : 's'}... *(Type \`+bounce stop @member\` to cancel)*`
     );
 
-    let movedCount = 0;
-    let completedRounds = 0;
-
-    for (let r = 1; r <= rounds; r++) {
-      let roundFinished = true;
-      for (const ch of tourChannels) {
-        if (!targetMember.voice?.channel || state.cancel) {
-          roundFinished = false;
-          break;
-        }
-
-        try {
-          await targetMember.voice.setChannel(ch.id, `Voice bounce round ${r}/${rounds} initiated by ${message.author.tag}`);
-          movedCount++;
-        } catch (_) {}
-
-        await new Promise(res => setTimeout(res, 750));
+    const result = await bounceManager.startBounce({
+      guild,
+      targetMember,
+      botMember,
+      rounds,
+      returnToStart,
+      initiatorTag: message.author.tag,
+      onProgress: async (completed, total, moved) => {
+        await startMsg.edit(
+          `🌀 **Voice Bounce in progress for <@${targetMember.id}>...**\n` +
+          `Completed **${completed}/${total}** rounds (**${moved}** moves, ${Math.round((completed / total) * 100)}%)... *(Type \`+bounce stop @member\` to cancel)*`
+        ).catch(() => {});
       }
+    });
 
-      if (!targetMember.voice?.channel || state.cancel) break;
-      if (roundFinished) completedRounds++;
+    if (!result.success) {
+      return startMsg.edit(result.error || 'Failed to start voice bounce.');
     }
-
-    if (returnToStart && targetMember.voice?.channel) {
-      await targetMember.voice.setChannel(startChannel.id).catch(() => {});
-    }
-
-    activeBounces.delete(targetMember.id);
 
     const embed = new EmbedBuilder()
       .setColor(COLORS.PRIMARY)
       .setTitle('🌀 Voice Bounce Completed!')
       .setDescription(
-        `Successfully moved <@${targetMember.id}> across **${movedCount}** voice channel${movedCount === 1 ? '' : 's'} over **${completedRounds}/${rounds}** round${rounds === 1 ? '' : 's'} in **${(movedCount * 0.75).toFixed(1)}** seconds!` +
-        (returnToStart ? `\nReturned back to <#${startChannel.id}>.` : '') +
-        (state.cancel ? '\n⚠️ *Operation was stopped early.*' : '')
+        `Successfully moved <@${targetMember.id}> across **${result.movedCount}** voice channels over **${result.completedRounds}/${rounds}** round${rounds === 1 ? '' : 's'} in **${(result.movedCount * 0.8).toFixed(1)}** seconds!` +
+        (returnToStart ? `\nReturned back to <#${result.startChannelId}>.` : '') +
+        (result.canceled ? '\n⚠️ *Operation was stopped early.*' : '')
       )
       .setFooter({ text: `Requested by ${message.author.username}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
       .setTimestamp();
