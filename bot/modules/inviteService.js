@@ -1,8 +1,11 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 const Invite = require('../../models/Invite');
 const MemberInvite = require('../../models/MemberInvite');
 const logger = require('../../shared/logger');
 const { COLORS } = require('../../shared/constants');
+const guildService = require('../../shared/guildService');
+const { isBotOwner } = require('../../shared/permissionHelper');
+const whitelistService = require('../../shared/whitelistService');
 
 // Fast in-memory cache of guild invites: Map<guildId, Map<inviteCode, uses>>
 const guildInvitesCache = new Map();
@@ -47,13 +50,231 @@ const inviteService = {
   },
 
   /**
-   * Handle invite create event
+   * Checks whether a user is authorized to create / share invites
    */
-  handleInviteCreate(invite) {
+  async isUserAuthorizedToInvite(userId, guild, settings, client) {
+    if (!userId || !guild) return false;
+    const uid = String(userId);
+
+    // 1. Bot Developer / Owner bypass
+    if (isBotOwner(uid, client)) return true;
+
+    // 2. Server Owner bypass
+    if (guild.ownerId === uid) return true;
+
+    // 3. Whitelisted Member bypass
+    if (whitelistService.isWhitelisted(uid, guild.id, settings)) return true;
+
+    // 4. Administrator permission check
+    const member = await guild.members.fetch(uid).catch(() => null);
+    if (!member) return false;
+    if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
+
+    // 5. Configured Inviter Role check
+    const roleId = settings?.inviteGuard?.roleId;
+    if (roleId && member.roles.cache.has(roleId)) return true;
+
+    return false;
+  },
+
+  /**
+   * Handle invite create event with Inviter Role enforcement
+   */
+  async handleInviteCreate(invite, client) {
     if (!invite || !invite.guild) return;
+
+    try {
+      const settings = await guildService.getSettings(invite.guild.id);
+      const guard = settings?.inviteGuard;
+
+      // Check if Inviter Guard module is active and role is set
+      if (settings?.modules?.invite_guard !== false && guard?.enabled && guard?.roleId) {
+        const inviter = invite.inviter;
+
+        // If inviter is bot itself, allow
+        if (inviter && inviter.id === client?.user?.id) {
+          // Allowed
+        } else if (inviter) {
+          const authorized = await this.isUserAuthorizedToInvite(inviter.id, invite.guild, settings, client);
+
+          if (!authorized) {
+            const inviteCode = invite.code;
+            // Immediately delete the unauthorized invite
+            await invite.delete('AURA Inviter Role Guard: Member lacks the required Inviter role.').catch(() => {});
+
+            // Alert the member via DM
+            try {
+              const dmEmbed = new EmbedBuilder()
+                .setColor(COLORS.ERROR)
+                .setTitle('🛡️ Unauthorized Invite Link Blocked')
+                .setDescription(
+                  `Hello **${inviter.username}**! In **${invite.guild.name}**, only members with the <@&${guard.roleId}> role are authorized to generate server invite links.\n\n` +
+                  `❌ The invite link you created (\`${inviteCode}\`) was automatically deleted.`
+                )
+                .setFooter({ text: invite.guild.name, iconURL: invite.guild.iconURL({ dynamic: true }) })
+                .setTimestamp();
+
+              await inviter.send({ embeds: [dmEmbed] }).catch(() => {});
+            } catch (_) {}
+
+            // Log to channel if configured
+            const logChannelId = guard.logChannelId || settings?.inviteTracker?.channelId;
+            if (logChannelId) {
+              const channel = invite.guild.channels.cache.get(logChannelId);
+              if (channel && channel.isTextBased()) {
+                const logEmbed = new EmbedBuilder()
+                  .setColor(COLORS.ERROR)
+                  .setTitle('🛡️ Unauthorized Invite Intercepted & Deleted')
+                  .setDescription(
+                    `👤 **User:** <@${inviter.id}> (\`${inviter.tag}\`)\n` +
+                    `🔗 **Invite Code:** \`${inviteCode}\` *(Deleted)*\n` +
+                    `📍 **Channel:** ${invite.channel ? `<#${invite.channel.id}>` : 'Unknown'}\n` +
+                    `⚠️ **Reason:** Missing required Inviter role (<@&${guard.roleId}>).`
+                  )
+                  .setTimestamp();
+
+                await channel.send({ embeds: [logEmbed] }).catch(() => {});
+              }
+            }
+
+            logger.warn(`[InviteGuard] Deleted unauthorized invite ${inviteCode} created by ${inviter.tag} in ${invite.guild.name}`);
+            return; // Do not cache deleted invite
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('Error in handleInviteCreate:', err.message);
+    }
+
     const cache = guildInvitesCache.get(invite.guild.id) || new Map();
     cache.set(invite.code, invite.uses || 0);
     guildInvitesCache.set(invite.guild.id, cache);
+  },
+
+  /**
+   * Intercept and block Discord invite links sent by unauthorized members in chat
+   */
+  async handleChatInviteCheck(message, settings, client) {
+    if (!message || !message.guild || message.author.bot) return false;
+    const guard = settings?.inviteGuard;
+    if (!guard?.enabled || !guard?.roleId || guard?.blockChatInvites === false) {
+      return false;
+    }
+
+    const DISCORD_INVITE_REGEX = /(https?:\/\/)?(www\.)?(discord\.(gg|io|me|li|com)|discordapp\.com\/invite)\/[a-zA-Z0-9_-]+/gi;
+    if (!DISCORD_INVITE_REGEX.test(message.content)) {
+      return false;
+    }
+
+    const authorized = await this.isUserAuthorizedToInvite(message.author.id, message.guild, settings, client);
+    if (authorized) {
+      return false; // Authorized to share invites
+    }
+
+    // Delete message
+    await message.delete().catch(() => {});
+
+    // Send temporary warning
+    const warnMsg = await message.channel.send({
+      content: `⚠️ <@${message.author.id}>, only members with the <@&${guard.roleId}> role are authorized to share invite links.`
+    }).catch(() => {});
+    if (warnMsg) setTimeout(() => warnMsg.delete().catch(() => {}), 5000);
+
+    // Log to log channel
+    const logChannelId = guard.logChannelId || settings?.inviteTracker?.channelId;
+    if (logChannelId) {
+      const channel = message.guild.channels.cache.get(logChannelId);
+      if (channel && channel.isTextBased()) {
+        const logEmbed = new EmbedBuilder()
+          .setColor(COLORS.ERROR)
+          .setTitle('🛡️ Unauthorized Invite Link Blocked in Chat')
+          .setDescription(
+            `👤 **User:** <@${message.author.id}> (\`${message.author.tag}\`)\n` +
+            `📍 **Channel:** <#${message.channel.id}>\n` +
+            `💬 **Blocked Content:** \`${message.content.substring(0, 100)}\`\n` +
+            `⚠️ **Reason:** Missing required Inviter role (<@&${guard.roleId}>).`
+          )
+          .setTimestamp();
+        await channel.send({ embeds: [logEmbed] }).catch(() => {});
+      }
+    }
+
+    return true; // Handled and blocked
+  },
+
+  /**
+   * Sync Discord server permissions for the Inviter role:
+   * - Remove CreateInstantInvite from @everyone
+   * - Add CreateInstantInvite to the target Inviter role
+   * - Sync channel overwrites
+   */
+  async syncInvitePermissions(guild, roleId) {
+    if (!guild || !roleId) return { success: false, error: 'Invalid parameters' };
+
+    let everyoneDisabled = false;
+    let roleGranted = false;
+    let channelsUpdated = 0;
+
+    try {
+      // 1. Remove CreateInstantInvite from @everyone role
+      const everyoneRole = guild.roles.everyone;
+      if (everyoneRole && everyoneRole.permissions.has(PermissionsBitField.Flags.CreateInstantInvite)) {
+        const newPerms = everyoneRole.permissions.remove(PermissionsBitField.Flags.CreateInstantInvite);
+        await everyoneRole.setPermissions(newPerms, 'AURA Inviter Role Guard: Restrict invite creation');
+        everyoneDisabled = true;
+      }
+
+      // 2. Grant CreateInstantInvite to the target Inviter role
+      const inviterRole = guild.roles.cache.get(roleId);
+      if (inviterRole) {
+        if (!inviterRole.permissions.has(PermissionsBitField.Flags.CreateInstantInvite)) {
+          const newRolePerms = inviterRole.permissions.add(PermissionsBitField.Flags.CreateInstantInvite);
+          await inviterRole.setPermissions(newRolePerms, 'AURA Inviter Role Guard: Allow invite creation');
+        }
+        roleGranted = true;
+      }
+
+      // 3. Update channel permission overwrites so channels don't override @everyone to allow invites
+      for (const channel of guild.channels.cache.values()) {
+        if (!channel.isTextBased() && !channel.isVoiceBased()) continue;
+        try {
+          const everyoneOverwrite = channel.permissionOverwrites?.cache?.get(guild.id);
+          if (everyoneOverwrite && everyoneOverwrite.allow.has(PermissionsBitField.Flags.CreateInstantInvite)) {
+            await channel.permissionOverwrites.edit(guild.id, {
+              CreateInstantInvite: false
+            }, { reason: 'AURA Inviter Role Guard: Channel overwrite sync' });
+            channelsUpdated++;
+          }
+        } catch (_) {}
+      }
+
+      return { success: true, everyoneDisabled, roleGranted, channelsUpdated };
+    } catch (err) {
+      logger.error('Failed to sync invite permissions:', err.message);
+      return { success: false, error: err.message };
+    }
+  },
+
+  /**
+   * Purge pre-existing server invites created by users who lack the Inviter role
+   */
+  async purgeUnauthorizedInvites(guild, settings, client) {
+    if (!guild || !settings?.inviteGuard?.roleId) return 0;
+    const invites = await guild.invites.fetch().catch(() => null);
+    if (!invites || invites.size === 0) return 0;
+
+    let purged = 0;
+    for (const [code, inv] of invites) {
+      if (!inv.inviter) continue;
+      if (inv.inviter.id === client?.user?.id) continue;
+
+      const authorized = await this.isUserAuthorizedToInvite(inv.inviter.id, guild, settings, client);
+      if (!authorized) {
+        await inv.delete('AURA Inviter Role Guard: Purging pre-existing unauthorized invite').catch(() => {});
+        purged++;
+      }
+    }
+    return purged;
   },
 
   /**

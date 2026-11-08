@@ -73,6 +73,10 @@ function buildHelpEmbed(prefix, client) {
       {
         name: '🛡️ Whitelist (Bypass Admin Permissions)',
         value: `\`${prefix}whitelist add @user\` • \`${prefix}whitelist remove @user\` • \`${prefix}whitelist list\` • \`${prefix}whitelist clear\`\n*Whitelist members so they can run all commands without needing Discord Administrator permissions! (Owner & Bot Dev only)*`
+      },
+      {
+        name: '🔒 Inviter Role Guard (Exclusive Invite Generation)',
+        value: `\`${prefix}inviterole set @role\` • \`${prefix}inviterole view\` • \`${prefix}inviterole sync\` • \`${prefix}inviterole clean\` • \`${prefix}inviterole disable\`\n*Locks invite creation exclusively to the designated role! Denies @everyone from creating invites, intercepts and deletes unauthorized invite links instantly, and blocks chat invite links.*`
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })
@@ -80,7 +84,7 @@ function buildHelpEmbed(prefix, client) {
 }
 
 function buildHelpButtons() {
-  const dashboardUrl = process.env.DASHBOARD_URL || 'https://aura-bot-dashboard.vercel.app';
+  const dashboardUrl = process.env.DASHBOARD_URL || 'https://dashboard-alpha-lovat.vercel.app';
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setLabel('Open Web Dashboard')

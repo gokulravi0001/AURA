@@ -13,6 +13,7 @@ const countingService = require('../../modules/countingService');
 const wordChainService = require('../../modules/wordChainService');
 const bumpService = require('../../modules/bumpService');
 const statsService = require('../../modules/statsService');
+const inviteService = require('../../modules/inviteService');
 
 module.exports = {
   name: 'messageCreate',
@@ -33,6 +34,10 @@ module.exports = {
       }
       return; // Bots do not earn XP, execute user commands, or play games
     }
+
+    // Inviter Role Guard: Block unauthorized invite links in chat
+    const inviteBlocked = await inviteService.handleChatInviteCheck(message, settings, client);
+    if (inviteBlocked) return;
 
     // 1. PREFIX COMMAND HANDLING (+)
     if (message.content.startsWith(prefix)) {

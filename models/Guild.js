@@ -20,7 +20,8 @@ const GuildSchema = new mongoose.Schema({
     tickets: { type: Boolean, default: true },
     bump_reminder: { type: Boolean, default: true },
     invite_tracker: { type: Boolean, default: true },
-    emoji_manager: { type: Boolean, default: true }
+    emoji_manager: { type: Boolean, default: true },
+    invite_guard: { type: Boolean, default: true }
   },
 
   leveling: {
@@ -118,6 +119,13 @@ const GuildSchema = new mongoose.Schema({
     channelId: { type: String, default: null },
     joinMessage: { type: String, default: '👋 Welcome {user} to **{server}**! Invited by **{inviter}** (**{total}** invites) using code `{code}`.' },
     leaveMessage: { type: String, default: '📤 **{user}** left the server. Invited by **{inviter}** (**{total}** invites).' }
+  },
+
+  inviteGuard: {
+    enabled: { type: Boolean, default: false },
+    roleId: { type: String, default: null },
+    blockChatInvites: { type: Boolean, default: true },
+    logChannelId: { type: String, default: null }
   },
 
   whitelist: [{ type: String }]

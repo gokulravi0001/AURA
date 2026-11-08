@@ -7,6 +7,8 @@ const {
 const Invite = require('../../../models/Invite');
 const Guild = require('../../../models/Guild');
 const { COLORS } = require('../../../shared/constants');
+const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
+const inviteService = require('../../modules/inviteService');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -47,6 +49,12 @@ module.exports = {
       sub.setName('reset')
         .setDescription('Reset all invites for a member (Admin only)')
         .addUserOption(opt => opt.setName('user').setDescription('Target member').setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName('guard')
+        .setDescription('Configure exclusive Inviter role requirements (Admin only)')
+        .addRoleOption(opt => opt.setName('role').setDescription('Role required to create and share invites').setRequired(false))
+        .addBooleanOption(opt => opt.setName('enabled').setDescription('Enable or disable inviter role guard').setRequired(false))
     ),
   name: 'invites',
   description: 'View or manage server invites',
@@ -70,9 +78,63 @@ module.exports = {
       return interaction.reply({ embeds: [embed] });
     }
 
-    // Admin checks for management subcommands
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
+    // Admin / privileged checks for management subcommands
+    if (!isOwnerOrAdmin(interaction.member, interaction.guild, client, settings)) {
+      return interaction.reply({ content: '🚫 Administrator, Server Owner, or Whitelisted permissions required.', ephemeral: true });
+    }
+
+    // 2.5. GUARD
+    if (sub === 'guard') {
+      const role = interaction.options.getRole('role');
+      const enabledOpt = interaction.options.getBoolean('enabled');
+
+      if (!role && enabledOpt === null) {
+        const guard = settings?.inviteGuard;
+        const isEnabled = guard?.enabled && guard?.roleId;
+        const embed = new EmbedBuilder()
+          .setColor(isEnabled ? COLORS.PRIMARY : COLORS.WARNING)
+          .setTitle('🛡️ Inviter Role Guard Status')
+          .setDescription(
+            isEnabled
+              ? `**Status:** 🟢 **Active**\n• **Required Role:** <@&${guard.roleId}>\n• *Members without this role cannot generate invite links.*`
+              : `**Status:** 🔴 **Disabled**\nUse \`/inviterole set role:@Role\` or \`/invites guard role:@Role\` to enable.`
+          );
+        return interaction.reply({ embeds: [embed] });
+      }
+
+      const updateData = {};
+      if (role) {
+        updateData['inviteGuard.roleId'] = role.id;
+        updateData['inviteGuard.enabled'] = true;
+        updateData['modules.invite_guard'] = true;
+      }
+      if (enabledOpt !== null) {
+        updateData['inviteGuard.enabled'] = enabledOpt;
+      }
+
+      const updated = await Guild.findOneAndUpdate(
+        { guildId },
+        { $set: updateData },
+        { upsert: true, new: true }
+      );
+
+      if (role) {
+        await inviteService.syncInvitePermissions(interaction.guild, role.id);
+        await inviteService.purgeUnauthorizedInvites(interaction.guild, updated, client);
+      }
+
+      return interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.SUCCESS)
+            .setTitle('🛡️ Inviter Role Guard Updated')
+            .setDescription(
+              role
+                ? `Only members with the <@&${role.id}> role can now generate invite links or invite people to this server!`
+                : `Inviter Role Guard is now ${enabledOpt ? '🟢 Enabled' : '🔴 Disabled'}.`
+            )
+        ]
+      });
     }
 
     // 3. SETUP
@@ -161,10 +223,51 @@ module.exports = {
       return message.reply({ embeds: [embed] });
     }
 
+    // +inv guard @role / +inv guard off
+    if (action === 'guard') {
+      if (!isOwnerOrAdmin(message.member, message.guild, client, settings)) {
+        return message.reply('🚫 Administrator, Server Owner, or Whitelisted permissions required.');
+      }
+      const role = message.mentions.roles.first();
+      const subOpt = args[1]?.toLowerCase();
+
+      if (subOpt === 'off' || subOpt === 'disable') {
+        await Guild.updateOne({ guildId }, { $set: { 'inviteGuard.enabled': false } });
+        return message.reply('🔓 Inviter Role Guard disabled.');
+      }
+
+      if (!role) {
+        const guard = settings?.inviteGuard;
+        return message.reply(
+          guard?.enabled && guard?.roleId
+            ? `🛡️ Inviter Role Guard is currently **Active** for <@&${guard.roleId}>.`
+            : '🛡️ Inviter Role Guard is currently **Disabled**. Usage: `+inv guard @Role`'
+        );
+      }
+
+      const updated = await Guild.findOneAndUpdate(
+        { guildId },
+        {
+          $set: {
+            'modules.invite_guard': true,
+            'inviteGuard.enabled': true,
+            'inviteGuard.roleId': role.id,
+            'inviteGuard.blockChatInvites': true
+          }
+        },
+        { upsert: true, new: true }
+      );
+
+      await inviteService.syncInvitePermissions(message.guild, role.id);
+      await inviteService.purgeUnauthorizedInvites(message.guild, updated, client);
+
+      return message.reply(`🛡️ Inviter Role Guard activated! Only members with <@&${role.id}> can now create or share invites.`);
+    }
+
     // +inv setup #channel
     if (action === 'setup') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return message.reply('🚫 Administrator permission required.');
+      if (!isOwnerOrAdmin(message.member, message.guild, client, settings)) {
+        return message.reply('🚫 Administrator, Server Owner, or Whitelisted permissions required.');
       }
       const channel = message.mentions.channels.first();
       if (!channel) {
@@ -188,8 +291,8 @@ module.exports = {
 
     // +inv add @user <amount>
     if (action === 'add') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return message.reply('🚫 Administrator permission required.');
+      if (!isOwnerOrAdmin(message.member, message.guild, client, settings)) {
+        return message.reply('🚫 Administrator, Server Owner, or Whitelisted permissions required.');
       }
       const targetUser = message.mentions.users.first();
       const amount = parseInt(args[2], 10);
@@ -209,8 +312,8 @@ module.exports = {
 
     // +inv remove @user <amount>
     if (action === 'remove') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return message.reply('🚫 Administrator permission required.');
+      if (!isOwnerOrAdmin(message.member, message.guild, client, settings)) {
+        return message.reply('🚫 Administrator, Server Owner, or Whitelisted permissions required.');
       }
       const targetUser = message.mentions.users.first();
       const amount = parseInt(args[2], 10);
@@ -230,8 +333,8 @@ module.exports = {
 
     // +inv reset @user
     if (action === 'reset') {
-      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return message.reply('🚫 Administrator permission required.');
+      if (!isOwnerOrAdmin(message.member, message.guild, client, settings)) {
+        return message.reply('🚫 Administrator, Server Owner, or Whitelisted permissions required.');
       }
       const targetUser = message.mentions.users.first();
       if (!targetUser) return message.reply('❌ Usage: `+inv reset @user`');

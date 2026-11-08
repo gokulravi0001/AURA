@@ -30,7 +30,8 @@ module.exports = {
     TICKETS: 'tickets',
     BUMP_REMINDER: 'bump_reminder',
     INVITE_TRACKER: 'invite_tracker',
-    EMOJI_MANAGER: 'emoji_manager'
+    EMOJI_MANAGER: 'emoji_manager',
+    INVITE_GUARD: 'invite_guard'
   },
 
   // Default Guild Configuration
@@ -48,7 +49,8 @@ module.exports = {
       tickets: true,
       bump_reminder: true,
       invite_tracker: true,
-      emoji_manager: true
+      emoji_manager: true,
+      invite_guard: true
     },
     language: 'en',
     timezone: 'UTC'

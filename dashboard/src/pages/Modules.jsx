@@ -13,7 +13,8 @@ import {
   BarChart3,
   CheckCircle2,
   AlertCircle,
-  ShieldAlert
+  ShieldAlert,
+  Lock
 } from 'lucide-react';
 
 export default function Modules() {
@@ -77,7 +78,8 @@ export default function Modules() {
     { key: 'sticky_messages', name: 'Sticky Messages', icon: Pin, desc: 'Keeps important rules or notices pinned near the bottom of designated channels.' },
     { key: 'image_threads', name: 'Automatic Image Threads', icon: MessageSquareShare, desc: 'Automatically creates discussion threads on qualifying image posts.' },
     { key: 'minigames', name: 'Interactive Minigames', icon: Gamepad2, desc: 'Counting channels, Word Chain, Rock Paper Scissors, and Trivia.' },
-    { key: 'bump_reminder', name: 'Bump Reminder & Automation', icon: Flame, desc: 'Tracks server bump timers and pings your community when it is time to bump.' }
+    { key: 'bump_reminder', name: 'Bump Reminder & Automation', icon: Flame, desc: 'Tracks server bump timers and pings your community when it is time to bump.' },
+    { key: 'invite_guard', name: 'Inviter Role Guard', icon: Lock, desc: 'Restricts invite link creation and sharing exclusively to members with the designated Inviter role.' }
   ];
 
   if (!settings) {
