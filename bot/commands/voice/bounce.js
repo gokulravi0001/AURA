@@ -61,7 +61,21 @@ module.exports = {
       return interaction.reply({ content: '🚫 I do not have the **Move Members** permission in this server to bounce members.', ephemeral: true });
     }
 
-    const targetMember = interaction.options.getMember('target');
+    const targetUser = interaction.options.getUser('target');
+    let targetMember = interaction.options.getMember('target');
+    const targetId = targetMember?.id || targetUser?.id;
+
+    if (targetId && immunityService.isImmune(targetId, guild, client, settings)) {
+      return interaction.reply({
+        content: `🛡️ **Immunity Protected**: <@${targetId}> possesses **Immunity** and cannot be targeted by the voice bounce command (even by the Server Owner).`,
+        ephemeral: true
+      });
+    }
+
+    if (!targetMember && targetUser) {
+      targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
+    }
+
     if (!targetMember) {
       return interaction.reply({ content: '❌ Target member not found in this server.', ephemeral: true });
     }
@@ -82,7 +96,7 @@ module.exports = {
 
     if (immunityService.isImmune(targetMember, guild, client, settings)) {
       return interaction.reply({
-        content: `🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command.`,
+        content: `🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command (even by the Server Owner).`,
         ephemeral: true
       });
     }
@@ -157,10 +171,15 @@ module.exports = {
     // Stop command: +bounce stop @member
     const isStop = args.some(a => ['stop', 'cancel', 'halt'].includes(a.toLowerCase()));
 
+    const rawTargetId = args[0] ? args[0].replace(/[<@!>]/g, '') : null;
+    if (rawTargetId && immunityService.isImmune(rawTargetId, guild, client, settings)) {
+      return message.reply(`🛡️ **Immunity Protected**: <@${rawTargetId}> possesses **Immunity** and cannot be targeted by the voice bounce command (even by the Server Owner).`);
+    }
+
     let targetMember = message.mentions.members.first();
-    if (!targetMember && args[0]) {
-      const rawId = args[0].replace(/[<@!>]/g, '');
-      targetMember = guild.members.cache.get(rawId) ||
+    if (!targetMember && rawTargetId) {
+      targetMember = guild.members.cache.get(rawTargetId) ||
+        (await guild.members.fetch(rawTargetId).catch(() => null)) ||
         guild.members.cache.find(m => m.user.username.toLowerCase() === args[0].toLowerCase());
     }
 
@@ -187,7 +206,7 @@ module.exports = {
     }
 
     if (immunityService.isImmune(targetMember, guild, client, settings)) {
-      return message.reply(`🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command.`);
+      return message.reply(`🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command (even by the Server Owner).`);
     }
 
     const currentVoice = guild.voiceStates.cache.get(targetMember.id);

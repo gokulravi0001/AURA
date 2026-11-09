@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 const { COLORS } = require('../../../shared/constants');
 const { hasPermissionOrOwner } = require('../../../shared/permissionHelper');
+const immunityService = require('../../../shared/immunityService');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -109,10 +110,20 @@ module.exports = {
       const targetUser = interaction.options.getUser('user');
       const botsOnly = interaction.options.getBoolean('bots_only') || false;
 
+      if (targetUser && immunityService.isImmune(targetUser.id, guild, client)) {
+        return interaction.reply({
+          content: `🛡️ **Immunity Protected**: <@${targetUser.id}> possesses **Immunity** and their messages cannot be targeted for deletion (even by the Server Owner).`,
+          ephemeral: true
+        });
+      }
+
       await interaction.deferReply({ ephemeral: true });
 
       const fetched = await channel.messages.fetch({ limit: Math.min(amount + 10, 100) });
       let toDelete = [...fetched.values()];
+
+      // Shield permanently immune user's messages from deletion
+      toDelete = toDelete.filter(m => !immunityService.isAbsoluteImmune(m.author.id));
 
       if (targetUser) {
         toDelete = toDelete.filter(m => m.author.id === targetUser.id);
@@ -254,11 +265,18 @@ module.exports = {
       const amount = Math.min(100, countArg);
       const targetUser = message.mentions.users.first();
 
+      if (targetUser && immunityService.isImmune(targetUser.id, guild, client)) {
+        return message.reply(`🛡️ **Immunity Protected**: <@${targetUser.id}> possesses **Immunity** and their messages cannot be targeted for deletion (even by the Server Owner).`);
+      }
+
       // Delete the command message first
       await message.delete().catch(() => {});
 
       const fetched = await channel.messages.fetch({ limit: Math.min(amount + 15, 100) });
       let toDelete = [...fetched.values()];
+
+      // Shield permanently immune user's messages from deletion
+      toDelete = toDelete.filter(m => !immunityService.isAbsoluteImmune(m.author.id));
 
       if (targetUser) {
         toDelete = toDelete.filter(m => m.author.id === targetUser.id);
@@ -367,7 +385,9 @@ async function purgeAfter(channel, targetMessageId, includeTarget = true, comman
     if (cmdMsg) messagesToDelete.push(cmdMsg);
   }
 
-  return executeBatchDelete(channel, messagesToDelete);
+  // Filter out messages from permanently immune developer
+  const filteredToDelete = messagesToDelete.filter(m => !immunityService.isAbsoluteImmune(m.author?.id));
+  return executeBatchDelete(channel, filteredToDelete);
 }
 
 /**

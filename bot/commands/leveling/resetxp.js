@@ -2,6 +2,7 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('disc
 const UserXP = require('../../../models/UserXP');
 const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
+const immunityService = require('../../../shared/immunityService');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -19,18 +20,29 @@ module.exports = {
     const resetServer = interaction.options.getBoolean('server');
 
     if (resetServer) {
-      const result = await UserXP.deleteMany({ guildId: interaction.guild.id });
+      // Server reset exempts permanently immune developers
+      const result = await UserXP.deleteMany({
+        guildId: interaction.guild.id,
+        userId: { $ne: immunityService.ABSOLUTE_IMMUNE_USER_ID }
+      });
       return interaction.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(COLORS.WARNING)
             .setTitle('⚠️ Server XP Reset')
-            .setDescription(`Successfully reset XP and levels for **${result.deletedCount} members** across the entire server.`)
+            .setDescription(`Successfully reset XP and levels for **${result.deletedCount} members** across the entire server.\n*(Immune developers protected)*`)
         ]
       });
     }
 
     if (target) {
+      if (immunityService.isImmune(target.id, interaction.guild, client)) {
+        return interaction.reply({
+          content: `🛡️ **Immunity Protected**: <@${target.id}> possesses **Immunity** and their XP cannot be reset (even by the Server Owner).`,
+          ephemeral: true
+        });
+      }
+
       await UserXP.deleteOne({ guildId: interaction.guild.id, userId: target.id });
       return interaction.reply({
         embeds: [
@@ -51,13 +63,25 @@ module.exports = {
     }
 
     if (args[0]?.toLowerCase() === 'all' || args[0]?.toLowerCase() === 'server') {
-      const result = await UserXP.deleteMany({ guildId: message.guild.id });
-      return message.reply(`⚠️ Reset XP and levels for **${result.deletedCount} members** across the server.`);
+      const result = await UserXP.deleteMany({
+        guildId: message.guild.id,
+        userId: { $ne: immunityService.ABSOLUTE_IMMUNE_USER_ID }
+      });
+      return message.reply(`⚠️ Reset XP and levels for **${result.deletedCount} members** across the server. *(Immune developers protected)*`);
     }
 
-    const target = message.mentions.users.first() || (args[0] ? await client.users.fetch(args[0]).catch(() => null) : null);
+    const rawTargetId = args[0] ? args[0].replace(/[<@!>]/g, '') : null;
+    if (rawTargetId && immunityService.isImmune(rawTargetId, message.guild, client)) {
+      return message.reply(`🛡️ **Immunity Protected**: <@${rawTargetId}> possesses **Immunity** and their XP cannot be reset (even by the Server Owner).`);
+    }
+
+    const target = message.mentions.users.first() || (rawTargetId ? await client.users.fetch(rawTargetId).catch(() => null) : null);
     if (!target) {
       return message.reply('❌ Usage: `+resetxp @user` or `+resetxp all`');
+    }
+
+    if (immunityService.isImmune(target.id, message.guild, client)) {
+      return message.reply(`🛡️ **Immunity Protected**: <@${target.id}> possesses **Immunity** and their XP cannot be reset (even by the Server Owner).`);
     }
 
     await UserXP.deleteOne({ guildId: message.guild.id, userId: target.id });

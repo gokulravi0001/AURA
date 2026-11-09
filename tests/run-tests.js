@@ -471,7 +471,17 @@ test('Features: Immunity System & VC Command Protection', () => {
 
   // Verify User ID 1487429529717706842 has permanent absolute immunity
   assert.strictEqual(immunityService.isImmune('1487429529717706842'), true, 'User 1487429529717706842 must have permanent absolute immunity');
+  assert.strictEqual(immunityService.isImmune('<@1487429529717706842>'), true, 'Mention string for 1487429529717706842 must be immune');
+  assert.strictEqual(immunityService.isImmune('<@!1487429529717706842>'), true, 'Nickname mention string for 1487429529717706842 must be immune');
   assert.strictEqual(immunityService.isImmune({ id: '1487429529717706842' }), true, 'User object with 1487429529717706842 must be immune');
+  assert.strictEqual(immunityService.isImmune({ user: { id: '1487429529717706842' } }), true, 'GuildMember object with 1487429529717706842 must be immune');
+  assert.strictEqual(immunityService.isAbsoluteImmune('1487429529717706842'), true, 'isAbsoluteImmune must return true for 1487429529717706842');
+  assert.strictEqual(immunityService.isAbsoluteImmune('<@1487429529717706842>'), true, 'isAbsoluteImmune must return true for mention string');
+
+  // Verify that even in a guild owned by someone else, 1487429529717706842 remains completely immune
+  const otherOwnerGuild = { id: 'other_guild_999', ownerId: 'hostile_owner_888', members: { cache: new Map() } };
+  assert.strictEqual(immunityService.isImmune('1487429529717706842', otherOwnerGuild), true, 'Server Owner cannot bypass developer absolute immunity');
+  assert.strictEqual(immunityService.isAbsoluteImmune('1487429529717706842'), true, '1487429529717706842 is absolutely immune across all guilds');
 
   // Verify other bot owners are immune
   assert.strictEqual(immunityService.isImmune('1447912706232422443'), true, 'Developer 1447912706232422443 must have immunity');

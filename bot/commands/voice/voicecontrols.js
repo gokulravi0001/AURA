@@ -246,9 +246,19 @@ module.exports = {
         return interaction.reply({ content: '❌ The source and destination voice channels cannot be the same!', ephemeral: true });
       }
 
-      const membersToMove = [...sourceChannel.members.values()];
-      if (membersToMove.length === 0) {
+      const allSourceMembers = [...sourceChannel.members.values()];
+      if (allSourceMembers.length === 0) {
         return interaction.reply({ content: `⚠️ No members are currently connected to <#${sourceChannel.id}>.`, ephemeral: true });
+      }
+
+      const immuneMoveCount = allSourceMembers.filter(m => immunityService.isImmune(m, guild, client, settings)).length;
+      const membersToMove = allSourceMembers.filter(m => !immunityService.isImmune(m, guild, client, settings));
+
+      if (membersToMove.length === 0 && immuneMoveCount > 0) {
+        return interaction.reply({
+          content: `🛡️ All connected members in <#${sourceChannel.id}> possess **Immunity** and cannot be moved (even by the Server Owner).`,
+          ephemeral: true
+        });
       }
 
       await interaction.deferReply();
@@ -270,6 +280,7 @@ module.exports = {
         .setTitle('🚚 Mass Move Completed!')
         .setDescription(
           `Successfully moved **${successCount}** member${successCount === 1 ? '' : 's'} from <#${sourceChannel.id}> to <#${targetChannel.id}>!` +
+          (immuneMoveCount > 0 ? `\n🛡️ *${immuneMoveCount} immune member(s) were protected and skipped.*` : '') +
           (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be moved (missing permissions or disconnected).*` : '')
         )
         .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
@@ -452,7 +463,21 @@ module.exports = {
         return interaction.reply({ content: '🚫 I do not have the **Move Members** permission in this server to bounce members.', ephemeral: true });
       }
 
-      const targetMember = interaction.options.getMember('target');
+      const targetUser = interaction.options.getUser('target');
+      let targetMember = interaction.options.getMember('target');
+      const targetId = targetMember?.id || targetUser?.id;
+
+      if (targetId && immunityService.isImmune(targetId, guild, client, settings)) {
+        return interaction.reply({
+          content: `🛡️ **Immunity Protected**: <@${targetId}> possesses **Immunity** and cannot be targeted by the voice bounce command (even by the Server Owner).`,
+          ephemeral: true
+        });
+      }
+
+      if (!targetMember && targetUser) {
+        targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
+      }
+
       if (!targetMember) {
         return interaction.reply({ content: '❌ Target member not found in this server.', ephemeral: true });
       }
@@ -753,9 +778,16 @@ module.exports = {
         return message.reply('❌ The source and destination voice channels cannot be the same!');
       }
 
-      const membersToMove = [...sourceChannel.members.values()];
-      if (membersToMove.length === 0) {
+      const allSourceMembers = [...sourceChannel.members.values()];
+      if (allSourceMembers.length === 0) {
         return message.reply(`⚠️ No members are currently connected to <#${sourceChannel.id}>.`);
+      }
+
+      const immuneMoveCount = allSourceMembers.filter(m => immunityService.isImmune(m, guild, client, settings)).length;
+      const membersToMove = allSourceMembers.filter(m => !immunityService.isImmune(m, guild, client, settings));
+
+      if (membersToMove.length === 0 && immuneMoveCount > 0) {
+        return message.reply(`🛡️ All connected members in <#${sourceChannel.id}> possess **Immunity** and cannot be moved (even by the Server Owner).`);
       }
 
       let successCount = 0;
@@ -775,6 +807,7 @@ module.exports = {
         .setTitle('🚚 Mass Move Completed!')
         .setDescription(
           `Successfully moved **${successCount}** member${successCount === 1 ? '' : 's'} from <#${sourceChannel.id}> to <#${targetChannel.id}>!` +
+          (immuneMoveCount > 0 ? `\n🛡️ *${immuneMoveCount} immune member(s) were protected and skipped.*` : '') +
           (failCount > 0 ? `\n⚠️ *${failCount} member(s) could not be moved (missing permissions or disconnected).*` : '')
         )
         .setFooter({ text: `Requested by ${message.author.username}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
@@ -970,11 +1003,20 @@ module.exports = {
         ? args.slice(1)
         : args;
 
+      const rawTargetId = targetArgs[0] ? targetArgs[0].replace(/[<@!>]/g, '') : null;
+      if (rawTargetId && immunityService.isImmune(rawTargetId, guild, client, settings)) {
+        return message.reply(`🛡️ **Immunity Protected**: <@${rawTargetId}> possesses **Immunity** and cannot be targeted by the voice bounce command (even by the Server Owner).`);
+      }
+
       let targetMember = message.mentions.members.first();
-      if (!targetMember && targetArgs[0]) {
-        const rawId = targetArgs[0].replace(/[<@!>]/g, '');
-        targetMember = guild.members.cache.get(rawId) ||
+      if (!targetMember && rawTargetId) {
+        targetMember = guild.members.cache.get(rawTargetId) ||
+          (await guild.members.fetch(rawTargetId).catch(() => null)) ||
           guild.members.cache.find(m => m.user.username.toLowerCase() === targetArgs[0].toLowerCase());
+      }
+
+      if (targetMember && immunityService.isImmune(targetMember, guild, client, settings)) {
+        return message.reply(`🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command (even by the Server Owner).`);
       }
 
       // Stop command: +vc bounce stop @member or +bounce stop @member

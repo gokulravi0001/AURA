@@ -107,11 +107,12 @@ const bounceManager = {
       return { success: false, error: 'Target member is already in an active voice bounce tour.' };
     }
 
-    // Check Immunity
-    if (immunityService.isImmune(targetMember, guild)) {
+    // Check Immunity (Protected even against Server Owner)
+    const targetUserId = targetMember?.id || targetMember?.user?.id;
+    if (immunityService.isImmune(targetUserId || targetMember, guild)) {
       return {
         success: false,
-        error: `🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command.`
+        error: `🛡️ **Immunity Protected**: <@${targetUserId || targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command (even by the Server Owner).`
       };
     }
 

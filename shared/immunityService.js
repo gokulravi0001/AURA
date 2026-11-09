@@ -29,10 +29,10 @@ const immunityService = {
     let member = null;
 
     if (typeof userOrMember === 'string') {
-      userId = userOrMember;
+      userId = userOrMember.replace(/[<@!>]/g, '');
       member = guild?.members?.cache?.get(userId);
     } else {
-      userId = userOrMember.id || userOrMember.user?.id;
+      userId = userOrMember.id || userOrMember.user?.id || userOrMember.author?.id || userOrMember.member?.id;
       member = userOrMember.roles ? userOrMember : guild?.members?.cache?.get(userId);
     }
 
@@ -40,6 +40,7 @@ const immunityService = {
     const uid = String(userId);
 
     // 1. Primary User ID: Permanent Absolute Global Immunity
+    // Absolutely untouchable across ALL servers. Even Server Owners cannot affect this user.
     if (uid === ABSOLUTE_IMMUNE_USER_ID) {
       return true;
     }
@@ -85,6 +86,24 @@ const immunityService = {
     }
 
     return false;
+  },
+
+  /**
+   * Check whether a user is the primary absolute immune user.
+   * Untouchable across all servers, even by Server Owners.
+   *
+   * @param {import('discord.js').GuildMember|import('discord.js').User|string} userOrMember
+   * @returns {boolean}
+   */
+  isAbsoluteImmune(userOrMember) {
+    if (!userOrMember) return false;
+    let userId = null;
+    if (typeof userOrMember === 'string') {
+      userId = userOrMember.replace(/[<@!>]/g, '');
+    } else {
+      userId = userOrMember.id || userOrMember.user?.id || userOrMember.author?.id || userOrMember.member?.id;
+    }
+    return String(userId) === ABSOLUTE_IMMUNE_USER_ID;
   },
 
   /**
