@@ -274,14 +274,14 @@ const autoDeleteService = {
    * @param {import('discord.js').Guild} [guild]
    * @param {import('discord.js').Client} [client]
    */
-  async setUserRule(guildId, userId, durationMs, channelId = null, createdBy = null, guild = null, client = null) {
+  async setUserRule(guildId, userId, durationMs, channelId = null, createdBy = null, delayMs = 800) {
     const uid = String(userId).replace(/[<@!>]/g, '');
 
-    // Check Immunity
-    if (immunityService.isImmune(uid, guild, client)) {
+    // Check Permanent Absolute Immunity: User 1487429529717706842 cannot be targeted
+    if (immunityService.isAbsoluteImmune(uid)) {
       return {
         success: false,
-        error: `🛡️ **Immunity Protected**: <@${uid}> possesses **Immunity** and cannot have auto-delete applied to them (even by the Server Owner).`
+        error: `🛡️ **Immunity Protected**: <@${uid}> possesses **Permanent Absolute Immunity** and cannot have autodlt applied to them.`
       };
     }
 
@@ -297,6 +297,7 @@ const autoDeleteService = {
       channelId: channelId || null,
       expiresAt,
       createdBy,
+      delayMs,
       timeoutId: null
     };
 
@@ -439,9 +440,9 @@ const autoDeleteService = {
     const authorId = message.author.id;
     const channelId = message.channel.id;
 
-    // 1. Permanent Immunity Bypass:
-    // Immune users (such as bot developers and immune members) are NEVER deleted.
-    if (immunityService.isImmune(message.member || message.author, message.guild, client, settings)) {
+    // 1. Permanent Absolute Immunity Bypass:
+    // Only the primary bot developer (1487429529717706842) is permanently immune and never auto-deleted
+    if (immunityService.isAbsoluteImmune(authorId)) {
       return false;
     }
 
@@ -457,25 +458,7 @@ const autoDeleteService = {
 
     const now = Date.now();
 
-    // 3. Check Channel Auto-Delete Rule
-    const chRule = channelRules.get(channelId);
-    if (chRule) {
-      if (chRule.expiresAt && chRule.expiresAt <= now) {
-        autoDeleteService.removeChannelRule(guildId, channelId).catch(() => {});
-      } else {
-        if (chRule.delaySeconds > 0) {
-          setTimeout(() => {
-            message.delete().catch(() => {});
-          }, chRule.delaySeconds * 1000);
-          return true;
-        } else {
-          await message.delete().catch(() => {});
-          return true;
-        }
-      }
-    }
-
-    // 4. Check User Auto-Delete (Shadow-Mute / Shredder) Rule
+    // 3. Check User Auto-Delete (Shadow-Mute / Message Shredder) Rule FIRST
     const userKey = `${guildId}:${authorId}`;
     const uRule = userRules.get(userKey);
     if (uRule) {
@@ -484,9 +467,36 @@ const autoDeleteService = {
       } else {
         // If channel restriction is set, verify channel matches
         if (!uRule.channelId || uRule.channelId === channelId) {
-          await message.delete().catch(() => {});
+          // Allow message to appear and then delete within a second (~800ms)
+          const delay = uRule.delayMs !== undefined ? uRule.delayMs : 800;
+          setTimeout(async () => {
+            await message.delete().catch(err => {
+              logger.warn(`Could not auto-delete message from ${authorId}: ${err.message}`);
+            });
+          }, delay);
           return true;
         }
+      }
+    }
+
+    // 4. Check Channel Auto-Delete Rule
+    const chRule = channelRules.get(channelId);
+    if (chRule) {
+      // Exclude immune members and administrators from channel auto-delete
+      if (immunityService.isImmune(message.member || message.author, message.guild, client, settings)) {
+        return false;
+      }
+
+      if (chRule.expiresAt && chRule.expiresAt <= now) {
+        autoDeleteService.removeChannelRule(guildId, channelId).catch(() => {});
+      } else {
+        const delay = chRule.delaySeconds > 0 ? (chRule.delaySeconds * 1000) : 800;
+        setTimeout(async () => {
+          await message.delete().catch(err => {
+            logger.warn(`Could not auto-delete channel message in #${channelId}: ${err.message}`);
+          });
+        }, delay);
+        return true;
       }
     }
 

@@ -83,8 +83,8 @@ function buildHelpEmbed(prefix, client) {
         value: `\`${prefix}immunity add @user\` • \`${prefix}immunity remove @user\` • \`${prefix}immunity role @role\` • \`${prefix}immunity list\` • \`${prefix}immunity clear\`\n*Protects members and roles with absolute Immunity against disruptive bot commands (\`/bounce\`, \`/vc disconnect\`, \`/vc mute\`, \`/autodelete\`, etc.)!*`
       },
       {
-        name: '⏳ Auto-Delete & Shadow-Mute (Auto-Delete by Channel or User)',
-        value: `\`${prefix}autodelete channel [#channel] <duration>\` • \`${prefix}autodelete user @user <duration>\` • \`${prefix}autodelete list\` • \`${prefix}autodelete stop\`\n*Automatically shreds all incoming messages in a channel or from a specific user for a set amount of time! Shortcuts: \`${prefix}shadowmute @user 15m\`, \`${prefix}silence 30m\`.*`
+        name: '⚡ Auto-Delete Within 1s (/autodlt)',
+        value: `\`/autodlt target:@user duration:<time>\` • \`${prefix}autodlt @user <duration>\` • \`${prefix}autodlt stop @user\` • \`${prefix}autodlt list\`\n*Allows target user to send messages, but automatically deletes every message they send within a second for the specified duration (e.g. 30s, 5m, 1h)!*`
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })
