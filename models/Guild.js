@@ -133,6 +133,21 @@ const GuildSchema = new mongoose.Schema({
   immunity: {
     users: [{ type: String }],
     roles: [{ type: String }]
+  },
+
+  autoDelete: {
+    channels: [{
+      channelId: { type: String, required: true },
+      expiresAt: { type: Date, default: null },
+      delaySeconds: { type: Number, default: 0 },
+      createdBy: { type: String, default: null }
+    }],
+    users: [{
+      userId: { type: String, required: true },
+      channelId: { type: String, default: null },
+      expiresAt: { type: Date, default: null },
+      createdBy: { type: String, default: null }
+    }]
   }
 }, {
   timestamps: true

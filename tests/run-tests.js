@@ -511,6 +511,90 @@ test('Features: Immunity System & VC Command Protection', () => {
   assert.strictEqual(immunityService.isImmune(mockMemberWithoutRole, mockGuild, null, immuneSettings), false, 'Member without immune role must not be immune');
 });
 
+// 21. Auto-Delete & Shadow-Mute Verification
+test('Features: Auto-Delete & Shadow-Mute System', async () => {
+  const autoDeleteService = require('../shared/autoDeleteService');
+  const autodeleteCmd = require('../bot/commands/moderation/autodelete');
+
+  // Verify command metadata
+  assert.strictEqual(autodeleteCmd.name, 'autodelete');
+  assert.ok(autodeleteCmd.aliases.includes('shadowmute'));
+  assert.ok(autodeleteCmd.aliases.includes('silence'));
+  assert.ok(autodeleteCmd.aliases.includes('shred'));
+  const json = autodeleteCmd.data.toJSON();
+  assert.strictEqual(json.name, 'autodelete');
+  assert.ok(json.options.find(o => o.name === 'channel'));
+  assert.ok(json.options.find(o => o.name === 'user'));
+  assert.ok(json.options.find(o => o.name === 'stop'));
+  assert.ok(json.options.find(o => o.name === 'list'));
+
+  // Verify parseDuration
+  const p30s = autoDeleteService.parseDuration('30s');
+  assert.strictEqual(p30s.ms, 30000);
+  assert.strictEqual(p30s.stop, false);
+
+  const p10m = autoDeleteService.parseDuration('10m');
+  assert.strictEqual(p10m.ms, 600000);
+
+  const pDefaultNum = autoDeleteService.parseDuration('15');
+  assert.strictEqual(pDefaultNum.ms, 900000); // 15m default
+
+  const p1h = autoDeleteService.parseDuration('2h');
+  assert.strictEqual(p1h.ms, 7200000);
+
+  const pStop = autoDeleteService.parseDuration('stop');
+  assert.strictEqual(pStop.stop, true);
+
+  const pOff = autoDeleteService.parseDuration('off');
+  assert.strictEqual(pOff.stop, true);
+
+  const pPerm = autoDeleteService.parseDuration('permanent');
+  assert.strictEqual(pPerm.ms, null);
+  assert.strictEqual(pPerm.stop, false);
+
+  // Verify formatDuration
+  assert.strictEqual(autoDeleteService.formatDuration(600000), '10m');
+
+  // Verify immune member CANNOT be targeted by user auto-delete
+  const immuneResult = await autoDeleteService.setUserRule('guild_test_1', '1487429529717706842', 60000);
+  assert.strictEqual(immuneResult.success, false, 'Immune developer 1487429529717706842 must be rejected from user auto-delete');
+  assert.ok(immuneResult.error.includes('Immunity Protected'));
+
+  // Verify regular member can be set for auto-delete
+  const normalUserResult = await autoDeleteService.setUserRule('guild_test_1', 'spammer_12345', 60000);
+  assert.strictEqual(normalUserResult.success, true);
+
+  // Verify handleMessage deletes message from targeted spammer
+  let spammerMsgDeleted = false;
+  const mockSpammerMsg = {
+    guild: { id: 'guild_test_1' },
+    channel: { id: 'channel_chat_1' },
+    author: { id: 'spammer_12345', bot: false },
+    content: 'Spam message!',
+    delete: async () => { spammerMsgDeleted = true; }
+  };
+  const wasSpamDeleted = await autoDeleteService.handleMessage(mockSpammerMsg);
+  assert.strictEqual(wasSpamDeleted, true);
+  assert.strictEqual(spammerMsgDeleted, true);
+
+  // Verify handleMessage NEVER deletes message from immune developer even in auto-deleted channel
+  await autoDeleteService.setChannelRule('guild_test_1', 'channel_chat_1', 60000);
+  let devMsgDeleted = false;
+  const mockDevMsg = {
+    guild: { id: 'guild_test_1' },
+    channel: { id: 'channel_chat_1' },
+    author: { id: '1487429529717706842', bot: false },
+    content: 'Developer announcement in silenced channel',
+    delete: async () => { devMsgDeleted = true; }
+  };
+  const wasDevDeleted = await autoDeleteService.handleMessage(mockDevMsg);
+  assert.strictEqual(wasDevDeleted, false, 'Developer messages must never be auto-deleted');
+  assert.strictEqual(devMsgDeleted, false);
+
+  // Clean up test rules
+  await autoDeleteService.clearAll('guild_test_1');
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);
