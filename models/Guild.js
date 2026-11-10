@@ -148,14 +148,6 @@ const GuildSchema = new mongoose.Schema({
       expiresAt: { type: Date, default: null },
       createdBy: { type: String, default: null }
     }]
-  },
-
-  tagRole: {
-    enabled: { type: Boolean, default: false },
-    tag: { type: String, default: null },
-    roleId: { type: String, default: null },
-    channelId: { type: String, default: null },
-    dmNotification: { type: Boolean, default: false }
   }
 }, {
   timestamps: true

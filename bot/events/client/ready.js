@@ -6,7 +6,6 @@ const stickyService = require('../../modules/stickyService');
 const inviteService = require('../../modules/inviteService');
 const whitelistService = require('../../../shared/whitelistService');
 const autoDeleteService = require('../../../shared/autoDeleteService');
-const tagRoleService = require('../../modules/tagRoleService');
 
 module.exports = {
   name: 'ready',
@@ -36,7 +35,6 @@ module.exports = {
       await stickyService.loadCache();
       await inviteService.init(client);
       await autoDeleteService.init(client);
-      tagRoleService.init(client);
 
       // Pre-fetch all members for all guilds so bot & human counters are accurate
       for (const guild of client.guilds.cache.values()) {

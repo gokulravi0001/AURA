@@ -15,7 +15,6 @@ const bumpService = require('../../modules/bumpService');
 const statsService = require('../../modules/statsService');
 const inviteService = require('../../modules/inviteService');
 const autoDeleteService = require('../../../shared/autoDeleteService');
-const tagRoleService = require('../../modules/tagRoleService');
 
 module.exports = {
   name: 'messageCreate',
@@ -298,11 +297,6 @@ module.exports = {
     // 5. STICKY MESSAGES (Repost / update sticky near bottom)
     if (settings?.modules?.sticky_messages !== false) {
       await stickyService.handleMessage(message, settings);
-    }
-
-    // 6. PASSIVE TAG ROLE CHECK (Active chatters)
-    if (message.member) {
-      tagRoleService.checkAndApply(message.member, settings, client, 'messageCreate').catch(() => {});
     }
   }
 };
