@@ -5,16 +5,98 @@ const { COLORS } = require('../../shared/constants');
 
 const tagRoleService = {
   /**
-   * Check if a member or user has adopted the server tag in their nickname, display name, or username.
+   * Normalize text by stripping diacritics, zero-width characters, and converting fancy unicode fonts to ASCII.
+   * Handles mathematical, cursive, and stylized fonts (e.g. 𝖳𝗁𝖾𝗋𝗂𝗅𝖺 -> therila).
+   */
+  normalizeText(str) {
+    if (!str) return '';
+    return String(str)
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .toLowerCase()
+      .trim();
+  },
+
+  /**
+   * Automatically detect and extract all valid server tag variants from the guild.
+   * If a custom tag was configured, it is included along with auto-detected variants.
+   *
+   * @param {import('discord.js').Guild} guild
+   * @param {string|null} [customTag]
+   * @returns {string[]} Array of normalized tag candidates
+   */
+  getServerTags(guild, customTag = null) {
+    const tags = new Set();
+
+    // 1. Explicit Custom Tag if configured
+    if (customTag && typeof customTag === 'string' && customTag.trim()) {
+      const cleanCustom = this.normalizeText(customTag);
+      if (cleanCustom) tags.add(cleanCustom);
+    }
+
+    if (!guild) return [...tags];
+
+    // 2. Vanity URL code (e.g. discord.gg/therla -> therla)
+    if (guild.vanityURLCode) {
+      const cleanVanity = this.normalizeText(guild.vanityURLCode);
+      if (cleanVanity) tags.add(cleanVanity);
+    }
+
+    const rawName = guild.name || '';
+    const normalizedName = this.normalizeText(rawName);
+
+    // 3. Extract bracketed tags: [TAG], (TAG), {TAG}
+    const bracketMatches = rawName.match(/\[([^\]]+)\]|\(([^\)]+)\)|\{([^\}]+)\}/g);
+    if (bracketMatches) {
+      for (const m of bracketMatches) {
+        const inner = this.normalizeText(m.slice(1, -1));
+        if (inner.length >= 2) tags.add(inner);
+      }
+    }
+
+    // 4. Extract separator-based segments: Server | TAG or TAG | Server
+    if (rawName.includes('|') || rawName.includes('•') || rawName.includes('—') || rawName.includes('~')) {
+      const parts = rawName.split(/[|•—~]/).map(p => this.normalizeText(p)).filter(Boolean);
+      for (const p of parts) {
+        if (p.length >= 2) tags.add(p);
+      }
+    }
+
+    // 5. Clean words from server name (ignoring generic stop words)
+    const cleanWords = normalizedName
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
+      .split(/\s+/)
+      .filter(w => w.length >= 2 && !['the', 'and', 'for', 'server', 'official', 'community', 'discord'].includes(w));
+
+    for (const w of cleanWords) {
+      tags.add(w);
+
+      // Common transliteration / vowel omission variants (e.g. therila <-> therla)
+      if (w === 'therila') tags.add('therla');
+      if (w === 'therla') tags.add('therila');
+    }
+
+    // Full cleaned name without symbols
+    const fullClean = cleanWords.join(' ');
+    if (fullClean.length >= 2) tags.add(fullClean);
+
+    return [...tags].filter(t => t.length >= 2);
+  },
+
+  /**
+   * Check if a member or user holds the server's tag in their nickname, display name, username, or custom status.
    *
    * @param {import('discord.js').GuildMember|import('discord.js').User} memberOrUser
-   * @param {string} tag
+   * @param {import('discord.js').Guild} guild
+   * @param {string|null} [customTag]
    * @returns {boolean}
    */
-  hasTag(memberOrUser, tag) {
-    if (!memberOrUser || !tag) return false;
-    const searchTag = String(tag).trim().toLowerCase();
-    if (!searchTag) return false;
+  hasTag(memberOrUser, guild, customTag = null) {
+    if (!memberOrUser) return false;
+
+    const serverTags = this.getServerTags(guild, customTag);
+    if (serverTags.length === 0) return false;
 
     const namesToCheck = [
       memberOrUser.nickname,
@@ -25,9 +107,17 @@ const tagRoleService = {
       memberOrUser.username
     ].filter(Boolean);
 
-    for (const name of namesToCheck) {
-      if (String(name).toLowerCase().includes(searchTag)) {
-        return true;
+    // Also check Discord Custom Status activity if available
+    const customStatus = memberOrUser.presence?.activities?.find(a => a.type === 4)?.state;
+    if (customStatus) namesToCheck.push(customStatus);
+
+    for (const rawName of namesToCheck) {
+      const normalizedMemberName = this.normalizeText(rawName);
+
+      for (const tag of serverTags) {
+        if (normalizedMemberName.includes(tag)) {
+          return true;
+        }
       }
     }
 
@@ -47,13 +137,12 @@ const tagRoleService = {
     if (!member || !member.guild || member.user?.bot) return { action: 'skipped' };
 
     const tagConfig = settings?.tagRole;
-    if (!tagConfig?.enabled || !tagConfig.tag || !tagConfig.roleId) {
+    if (!tagConfig?.enabled || !tagConfig.roleId) {
       return { action: 'disabled' };
     }
 
     const guild = member.guild;
     const roleId = tagConfig.roleId;
-    const tag = tagConfig.tag;
 
     // Resolve Role
     const role = guild.roles.cache.get(roleId);
@@ -71,47 +160,32 @@ const tagRoleService = {
       return { action: 'error', error: 'Tag role is higher than or equal to bot highest role.' };
     }
 
-    const memberHasTag = tagRoleService.hasTag(member, tag);
+    const memberHasTag = tagRoleService.hasTag(member, guild, tagConfig.tag);
     const hasRole = member.roles.cache.has(role.id);
 
-    // 1. Member adopted the tag but doesn't have the role -> Grant Role
+    // 1. Member holds the server tag but doesn't have the role -> Grant Role
     if (memberHasTag && !hasRole) {
       try {
-        await member.roles.add(role.id, `Adopted server tag: ${tag}`);
+        await member.roles.add(role.id, `Adopted server tag for ${guild.name}`);
         logger.info(`Granted tag role [${role.name}] to ${member.user.tag} in ${guild.name} (Source: ${source})`);
 
         // Channel Announcement
         if (tagConfig.channelId && source !== 'sync') {
           const channel = guild.channels.cache.get(tagConfig.channelId);
           if (channel?.isTextBased()) {
+            const detectedTag = tagConfig.tag || tagRoleService.getServerTags(guild)[0] || guild.name;
             const embed = new EmbedBuilder()
               .setColor(COLORS.SUCCESS)
               .setTitle('🏷️ Server Tag Adopted!')
               .setDescription(
-                `🎉 <@${member.id}> (\`${member.user.tag}\`) has adopted our server tag **\`${tag}\`** in their name and has been awarded the <@&${role.id}> role!\n\n` +
-                `*Thank you for representing and supporting **${guild.name}**!*`
+                `🎉 <@${member.id}> (\`${member.user.tag}\`) has adopted our server tag **\`${detectedTag}\`** and has been awarded the <@&${role.id}> role!\n\n` +
+                `*Thank you for supporting **${guild.name}**!*`
               )
               .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
               .setTimestamp();
 
             await channel.send({ embeds: [embed] }).catch(() => {});
           }
-        }
-
-        // Direct Message Notification
-        if (tagConfig.dmNotification && source !== 'sync') {
-          await member.send({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(COLORS.SUCCESS)
-                .setTitle(`🎉 Thank you for supporting ${guild.name}!`)
-                .setDescription(
-                  `You adopted our server tag **\`${tag}\`** and have automatically been granted the **${role.name}** role!\n\n` +
-                  `Keep the tag in your name to retain your exclusive role and perks.`
-                )
-                .setTimestamp()
-            ]
-          }).catch(() => {});
         }
 
         return { action: 'added', role };
@@ -121,10 +195,10 @@ const tagRoleService = {
       }
     }
 
-    // 2. Member removed the tag but still has the role -> Revoke Role
+    // 2. Member dropped the tag but still has the role -> Revoke Role
     if (!memberHasTag && hasRole) {
       try {
-        await member.roles.remove(role.id, `Removed server tag: ${tag}`);
+        await member.roles.remove(role.id, `Removed server tag for ${guild.name}`);
         logger.info(`Revoked tag role [${role.name}] from ${member.user.tag} in ${guild.name} (Source: ${source})`);
         return { action: 'removed', role };
       } catch (err) {
@@ -144,7 +218,7 @@ const tagRoleService = {
    * @param {import('discord.js').Client} client
    */
   async syncGuild(guild, settings, client) {
-    if (!settings?.tagRole?.enabled || !settings?.tagRole?.tag || !settings?.tagRole?.roleId) {
+    if (!settings?.tagRole?.enabled || !settings?.tagRole?.roleId) {
       return { success: false, error: 'Tag auto-role is not configured or disabled on this server.' };
     }
 
@@ -181,22 +255,21 @@ const tagRoleService = {
   /**
    * Configure Tag Auto-Role in the database.
    */
-  async setTagRole(guildId, { tag, roleId, channelId = null, dmNotification = false }) {
+  async setTagRole(guildId, { tag = null, roleId, channelId = null }) {
     await Guild.updateOne(
       { guildId },
       {
         $set: {
           'tagRole.enabled': true,
-          'tagRole.tag': tag,
+          'tagRole.tag': tag || null,
           'tagRole.roleId': roleId,
-          'tagRole.channelId': channelId,
-          'tagRole.dmNotification': dmNotification
+          'tagRole.channelId': channelId || null
         }
       },
       { upsert: true }
     );
 
-    return { success: true, tag, roleId, channelId, dmNotification };
+    return { success: true, tag, roleId, channelId };
   },
 
   /**

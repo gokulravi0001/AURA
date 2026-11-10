@@ -1,4 +1,6 @@
 const assert = require('assert');
+const Guild = require('../models/Guild');
+Guild.updateOne = async () => ({ acknowledged: true, modifiedCount: 1 });
 const birthdayService = require('../bot/modules/birthdayService');
 const levelingService = require('../bot/modules/levelingService');
 const { MODULES, COLORS } = require('../shared/constants');
@@ -602,36 +604,46 @@ test('Features: Server Tag Auto-Role System (/tagrole)', async () => {
   assert.ok(tagRoleCmd.aliases.includes('nametag'));
   const json = tagRoleCmd.data.toJSON();
   assert.strictEqual(json.name, 'tagrole');
-  assert.ok(json.options.find(o => o.name === 'set'));
+  const setSub = json.options.find(o => o.name === 'set');
+  assert.ok(setSub, 'Subcommand set must exist');
+  assert.strictEqual(setSub.options.find(o => o.name === 'role').required, true, 'Role option must be required');
+  assert.strictEqual(setSub.options.find(o => o.name === 'tag')?.required || false, false, 'Tag option must be optional');
   assert.ok(json.options.find(o => o.name === 'view'));
   assert.ok(json.options.find(o => o.name === 'sync'));
   assert.ok(json.options.find(o => o.name === 'disable'));
 
-  // Test hasTag matching
-  assert.strictEqual(tagRoleService.hasTag({ nickname: 'Gokul | therla' }, 'therla'), true, 'Nickname with tag must match');
-  assert.strictEqual(tagRoleService.hasTag({ displayName: '[Therla] Gokul' }, 'therla'), true, 'Display name with tag must match');
-  assert.strictEqual(tagRoleService.hasTag({ user: { username: 'therla_supporter' } }, 'therla'), true, 'Username with tag must match');
-  assert.strictEqual(tagRoleService.hasTag({ user: { globalName: 'Cool ⚡ THERLA' } }, 'therla'), true, 'Case-insensitive tag must match');
-  assert.strictEqual(tagRoleService.hasTag({ nickname: 'Regular User', user: { username: 'normal' } }, 'therla'), false, 'Non-tag member must return false');
-  assert.strictEqual(tagRoleService.hasTag(null, 'therla'), false);
-  assert.strictEqual(tagRoleService.hasTag({ nickname: 'hello' }, ''), false);
+  // Test auto-detection of server tags from guild name
+  const therilaGuild = { name: '𝖳𝗁𝖾𝗋𝗂𝗅𝖺 ✧' };
+  const detectedTags = tagRoleService.getServerTags(therilaGuild);
+  assert.ok(detectedTags.includes('therila'), 'Must auto-detect therila from 𝖳𝗁𝖾𝗋𝗂𝗅𝖺 ✧');
+  assert.ok(detectedTags.includes('therla'), 'Must include phonetic variant therla');
+
+  // Test hasTag matching with auto-detected server tags
+  const mockGuild = {
+    id: 'guild_therla_1',
+    name: '𝖳𝗁𝖾𝗋𝗂𝗅𝖺 ✧',
+    roles: new Map(),
+    channels: { cache: new Map() }
+  };
+  assert.strictEqual(tagRoleService.hasTag({ nickname: 'Gokul | therla' }, mockGuild), true, 'Nickname with therla must auto-match');
+  assert.strictEqual(tagRoleService.hasTag({ displayName: '[Therla] Gokul' }, mockGuild), true, 'Display name with Therla must auto-match');
+  assert.strictEqual(tagRoleService.hasTag({ user: { username: 'therla_supporter' } }, mockGuild), true, 'Username with therla must auto-match');
+  assert.strictEqual(tagRoleService.hasTag({ user: { globalName: 'Cool ⚡ THERILA' } }, mockGuild), true, 'Global name with THERILA must auto-match');
+  assert.strictEqual(tagRoleService.hasTag({ nickname: 'Regular User', user: { username: 'normal' } }, mockGuild), false, 'Non-tag member must return false');
+  assert.strictEqual(tagRoleService.hasTag(null, mockGuild), false);
 
   // Test checkAndApply logic
   let addedRoleId = null;
   let removedRoleId = null;
   const mockRole = { id: 'role_therla_supporter_1', name: 'Therla Supporter', position: 5 };
   const mockBot = { roles: { highest: { position: 10, name: 'AURA' } }, permissions: { has: () => true } };
-  const mockGuild = {
-    id: 'guild_therla_1',
-    name: 'Therla Server',
-    roles: { cache: new Map([[mockRole.id, mockRole]]) },
-    channels: { cache: new Map() },
-    members: { fetchMe: async () => mockBot }
-  };
+  mockGuild.roles = { cache: new Map([[mockRole.id, mockRole]]) };
+  mockGuild.members = { fetchMe: async () => mockBot };
+
   const mockSettings = {
     tagRole: {
       enabled: true,
-      tag: 'therla',
+      tag: null, // Auto-detect from guild name!
       roleId: mockRole.id
     }
   };
@@ -679,4 +691,5 @@ if (failed > 0) {
   process.exit(1);
 } else {
   console.log('\x1b[32m✔ All tests passed successfully!\x1b[0m\n');
+  process.exit(0);
 }
