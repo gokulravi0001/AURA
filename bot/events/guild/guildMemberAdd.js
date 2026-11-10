@@ -2,6 +2,7 @@ const guildService = require('../../../shared/guildService');
 const counterService = require('../../modules/counterService');
 const statsService = require('../../modules/statsService');
 const inviteService = require('../../modules/inviteService');
+const tagRoleService = require('../../modules/tagRoleService');
 
 module.exports = {
   name: 'guildMemberAdd',
@@ -22,6 +23,11 @@ module.exports = {
     // 2. Track Invites
     if (settings?.modules?.invite_tracker !== false && settings?.inviteTracker?.enabled !== false) {
       await inviteService.handleMemberJoin(member, settings, client);
+    }
+
+    // 3. Tag Auto-Role: Give role if new member already has server tag in their name
+    if (settings?.tagRole?.enabled) {
+      await tagRoleService.checkAndApply(member, settings, client, 'guildMemberAdd');
     }
   }
 };

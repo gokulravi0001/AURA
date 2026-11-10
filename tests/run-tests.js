@@ -590,6 +590,90 @@ test('Features: Auto-Delete & Shadow-Mute System (/autodlt)', async () => {
   await autoDeleteService.clearAll('guild_test_1');
 });
 
+// 22. Server Tag Auto-Role Verification (/tagrole)
+test('Features: Server Tag Auto-Role System (/tagrole)', async () => {
+  const tagRoleService = require('../bot/modules/tagRoleService');
+  const tagRoleCmd = require('../bot/commands/moderation/tagrole');
+
+  // Verify command metadata
+  assert.strictEqual(tagRoleCmd.name, 'tagrole');
+  assert.ok(tagRoleCmd.aliases.includes('tagautorole'));
+  assert.ok(tagRoleCmd.aliases.includes('servertag'));
+  assert.ok(tagRoleCmd.aliases.includes('nametag'));
+  const json = tagRoleCmd.data.toJSON();
+  assert.strictEqual(json.name, 'tagrole');
+  assert.ok(json.options.find(o => o.name === 'set'));
+  assert.ok(json.options.find(o => o.name === 'view'));
+  assert.ok(json.options.find(o => o.name === 'sync'));
+  assert.ok(json.options.find(o => o.name === 'disable'));
+
+  // Test hasTag matching
+  assert.strictEqual(tagRoleService.hasTag({ nickname: 'Gokul | therla' }, 'therla'), true, 'Nickname with tag must match');
+  assert.strictEqual(tagRoleService.hasTag({ displayName: '[Therla] Gokul' }, 'therla'), true, 'Display name with tag must match');
+  assert.strictEqual(tagRoleService.hasTag({ user: { username: 'therla_supporter' } }, 'therla'), true, 'Username with tag must match');
+  assert.strictEqual(tagRoleService.hasTag({ user: { globalName: 'Cool ⚡ THERLA' } }, 'therla'), true, 'Case-insensitive tag must match');
+  assert.strictEqual(tagRoleService.hasTag({ nickname: 'Regular User', user: { username: 'normal' } }, 'therla'), false, 'Non-tag member must return false');
+  assert.strictEqual(tagRoleService.hasTag(null, 'therla'), false);
+  assert.strictEqual(tagRoleService.hasTag({ nickname: 'hello' }, ''), false);
+
+  // Test checkAndApply logic
+  let addedRoleId = null;
+  let removedRoleId = null;
+  const mockRole = { id: 'role_therla_supporter_1', name: 'Therla Supporter', position: 5 };
+  const mockBot = { roles: { highest: { position: 10, name: 'AURA' } }, permissions: { has: () => true } };
+  const mockGuild = {
+    id: 'guild_therla_1',
+    name: 'Therla Server',
+    roles: { cache: new Map([[mockRole.id, mockRole]]) },
+    channels: { cache: new Map() },
+    members: { fetchMe: async () => mockBot }
+  };
+  const mockSettings = {
+    tagRole: {
+      enabled: true,
+      tag: 'therla',
+      roleId: mockRole.id
+    }
+  };
+
+  // 1. Member adopts tag, does not have role -> role must be added
+  const memberWithTag = {
+    id: 'user_therla_fan',
+    guild: mockGuild,
+    nickname: 'Pro Gamer | therla',
+    user: { tag: 'fan#0001', bot: false },
+    roles: {
+      cache: new Map(),
+      add: async (id) => { addedRoleId = id; },
+      remove: async (id) => { removedRoleId = id; }
+    }
+  };
+  const addResult = await tagRoleService.checkAndApply(memberWithTag, mockSettings, null, 'test');
+  assert.strictEqual(addResult.action, 'added');
+  assert.strictEqual(addedRoleId, mockRole.id);
+
+  // 2. Member already has tag AND has role -> unchanged
+  memberWithTag.roles.cache.set(mockRole.id, mockRole);
+  const unchangedResult = await tagRoleService.checkAndApply(memberWithTag, mockSettings, null, 'test');
+  assert.strictEqual(unchangedResult.action, 'unchanged');
+
+  // 3. Member dropped tag but still has role -> role must be removed
+  const memberDroppedTag = {
+    id: 'user_dropped_tag',
+    guild: mockGuild,
+    nickname: 'Pro Gamer',
+    user: { tag: 'exfan#0001', bot: false },
+    roles: {
+      cache: new Map([[mockRole.id, mockRole]]),
+      add: async (id) => { addedRoleId = id; },
+      remove: async (id) => { removedRoleId = id; }
+    }
+  };
+  const removeResult = await tagRoleService.checkAndApply(memberDroppedTag, mockSettings, null, 'test');
+  assert.strictEqual(removeResult.action, 'removed');
+  assert.strictEqual(removedRoleId, mockRole.id);
+});
+
 console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
 if (failed > 0) {
   process.exit(1);

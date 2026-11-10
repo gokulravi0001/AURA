@@ -15,6 +15,7 @@ const bumpService = require('../../modules/bumpService');
 const statsService = require('../../modules/statsService');
 const inviteService = require('../../modules/inviteService');
 const autoDeleteService = require('../../../shared/autoDeleteService');
+const tagRoleService = require('../../modules/tagRoleService');
 
 module.exports = {
   name: 'messageCreate',
@@ -43,6 +44,11 @@ module.exports = {
     // Auto-Delete / Shadow-Mute Guard: Automatically deletes messages in silenced channels or by silenced users
     const autoDeleted = await autoDeleteService.handleMessage(message, settings, client);
     if (autoDeleted) return;
+
+    // Tag Auto-Role: Passive check on active chatters
+    if (settings?.tagRole?.enabled && message.member) {
+      tagRoleService.checkAndApply(message.member, settings, client, 'chat').catch(() => {});
+    }
 
     // 1. PREFIX COMMAND HANDLING (+)
     if (message.content.startsWith(prefix)) {

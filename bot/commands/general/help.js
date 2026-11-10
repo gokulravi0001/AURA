@@ -85,6 +85,10 @@ function buildHelpEmbed(prefix, client) {
       {
         name: '⚡ Auto-Delete Within 1s (/autodlt)',
         value: `\`/autodlt target:@user duration:<time>\` • \`${prefix}autodlt @user <duration>\` • \`${prefix}autodlt stop @user\` • \`${prefix}autodlt list\`\n*Allows target user to send messages, but automatically deletes every message they send within a second for the specified duration (e.g. 30s, 5m, 1h)!*`
+      },
+      {
+        name: '🏷️ Server Tag Auto-Role (/tagrole)',
+        value: `\`${prefix}tagrole set <tag> @role [#channel]\` • \`${prefix}tagrole sync\` • \`${prefix}tagrole view\` • \`${prefix}tagrole disable\`\n*Automatically awards a role to anyone who adds your server tag (e.g. \`therla\`, \`[therla]\`) to their nickname or username! Also removes it if they drop the tag.*`
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })
