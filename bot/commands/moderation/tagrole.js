@@ -13,7 +13,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('tagrole')
     .setDescription('Automatically award a role to members who adopt the server tag in their name')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .addSubcommand(sub =>
       sub.setName('set')
         .setDescription('Configure the server tag and auto-role reward')

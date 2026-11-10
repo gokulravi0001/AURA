@@ -34,29 +34,29 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN)
 
     logger.info(`Found ${commands.length} current AURA slash commands to register.`);
 
-    // 1. Fetch all guilds and clear guild-specific commands to prevent duplicates with global commands
-    try {
-      const guilds = await rest.get(Routes.userGuilds());
-      logger.info(`Purging guild-specific slash commands from ${guilds.length} guilds to eliminate duplicates...`);
-
-      for (const guild of guilds) {
-        try {
-          await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: [] });
-          logger.success(`✓ Cleared guild-specific commands for: ${guild.name} (${guild.id})`);
-        } catch (e) {
-          logger.warn(`Could not clear commands for guild ${guild.name}:`, e.message);
-        }
-      }
-    } catch (err) {
-      logger.warn('Could not inspect guilds for command cleanup:', err.message);
-    }
-
-    // 2. Overwrite all Global application commands with ONLY the new AURA commands
+    // 1. Overwrite all Global application commands with the new AURA commands
     logger.info('Overwriting global application slash commands...');
     const data = await rest.put(
       Routes.applicationCommands(clientId),
       { body: commands }
     );
+
+    // 2. Register commands directly to all joined guilds for INSTANT (0-second) availability
+    try {
+      const guilds = await rest.get(Routes.userGuilds());
+      logger.info(`Deploying instant slash commands to ${guilds.length} guilds...`);
+
+      for (const guild of guilds) {
+        try {
+          await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: commands });
+          logger.success(`✓ Instant slash commands active for: ${guild.name} (${guild.id})`);
+        } catch (e) {
+          logger.warn(`Could not deploy guild commands for ${guild.name}:`, e.message);
+        }
+      }
+    } catch (err) {
+      logger.warn('Could not inspect guilds for direct deployment:', err.message);
+    }
 
     logger.success(`=================================================`);
     logger.success(`  SUCCESSFULLY REPLACED ALL BOT COMMANDS!`);

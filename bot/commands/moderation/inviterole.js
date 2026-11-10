@@ -13,7 +13,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('inviterole')
     .setDescription('Configure exclusive invite creation and sharing permissions for an Inviter role')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand(sub =>
       sub.setName('set')
         .setDescription('Set the role required to create and share invite links')

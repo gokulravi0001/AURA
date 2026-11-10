@@ -14,7 +14,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('autodlt')
     .setDescription('Automatically delete messages from a target user within a second for a set duration')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addUserOption(opt =>
       opt.setName('target')
         .setDescription('The member whose messages will be automatically deleted within a second')
