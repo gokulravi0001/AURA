@@ -26,8 +26,6 @@ module.exports = {
     }
 
     // 3. Tag Auto-Role: Give role if new member already has server tag in their name
-    if (settings?.tagRole?.enabled) {
-      await tagRoleService.checkAndApply(member, settings, client, 'guildMemberAdd');
-    }
+    await tagRoleService.checkAndApply(member, settings, client, 'guildMemberAdd');
   }
 };

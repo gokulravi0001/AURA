@@ -15,15 +15,15 @@ module.exports = {
     .setDescription('Automatically award a role to members who adopt the server tag in their name')
     .addSubcommand(sub =>
       sub.setName('set')
-        .setDescription('Set the role to automatically award to members who adopt this server\'s tag')
+        .setDescription('Configure or auto-detect the role awarded to members who adopt this server\'s tag')
         .addRoleOption(opt =>
           opt.setName('role')
-            .setDescription('The role automatically granted when a member adopts the server tag')
-            .setRequired(true)
+            .setDescription('Optional role (leave empty to auto-detect role like Loyal, Tag, etc.)')
+            .setRequired(false)
         )
         .addStringOption(opt =>
           opt.setName('tag')
-            .setDescription('Optional custom tag (leave empty to auto-detect from server name)')
+            .setDescription('Optional custom tag (leave empty to auto-detect from server name/vanity/symbol)')
             .setRequired(false)
         )
         .addChannelOption(opt =>
@@ -68,9 +68,22 @@ module.exports = {
 
     // 1. SET TAG ROLE
     if (sub === 'set') {
-      const role = interaction.options.getRole('role');
+      let role = interaction.options.getRole('role');
       const customTag = interaction.options.getString('tag')?.trim() || null;
       const channel = interaction.options.getChannel('channel');
+
+      // If role was not explicitly provided, auto-discover from server roles
+      if (!role) {
+        role = tagRoleService.resolveTagRole(guild, settings);
+      }
+
+      if (!role) {
+        return interaction.reply({
+          content: '⚠️ **Could not find a tag role automatically.**\n' +
+                   'Please specify the role: `/tagrole set role:@role` or create a role named **Tag**, **Tag Supporter**, or **Loyal**.',
+          ephemeral: true
+        });
+      }
 
       // Verify bot permissions
       const botMember = await guild.members.fetchMe().catch(() => null);
@@ -106,7 +119,7 @@ module.exports = {
       });
 
       // Fetch auto-detected tags for this server
-      const detectedTags = tagRoleService.getServerTags(guild, customTag);
+      const detectedTags = tagRoleService.getServerTags(guild, customTag, role);
       const tagDisplay = detectedTags.map(t => `\`${t}\``).join(', ');
 
       // Run immediate initial sync so existing members holding the tag receive the role right now!
@@ -114,7 +127,7 @@ module.exports = {
         tagRole: { enabled: true, tag: customTag, roleId: role.id, channelId: channel?.id }
       }, client);
 
-      const stats = syncResult.stats || { scanned: 0, added: 0, unchanged: 0 };
+      const stats = syncResult.stats || { scanned: 0, added: 0, removed: 0, unchanged: 0 };
 
       const embed = new EmbedBuilder()
         .setColor(COLORS.SUCCESS)
@@ -128,6 +141,7 @@ module.exports = {
           `📊 **Initial Server Scan Completed:**\n` +
           `• Scanned: **${stats.scanned}** members\n` +
           `• ➕ Granted role to **${stats.added}** members holding the tag\n` +
+          `• ➖ Revoked role from **${stats.removed}** members without tag\n` +
           `• ⚖️ **${stats.unchanged}** members up to date`
         )
         .setFooter({ text: `Activated by ${interaction.user.username}` })
@@ -138,38 +152,41 @@ module.exports = {
 
     // 2. VIEW / STATUS
     if (sub === 'view') {
-      const config = settings?.tagRole;
-      if (!config?.enabled || !config.roleId) {
+      const role = tagRoleService.resolveTagRole(guild, settings);
+      const customTag = settings?.tagRole?.tag || null;
+      const detectedTags = tagRoleService.getServerTags(guild, customTag, role);
+
+      if (!role) {
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
               .setColor(COLORS.WARNING)
-              .setTitle('🏷️ Server Tag Auto-Role — Disabled')
+              .setTitle('🏷️ Server Tag Auto-Role — Not Configured')
               .setDescription(
-                `Tag auto-role is not configured or currently disabled on **${guild.name}**.\n\n` +
-                `**To enable it simply run:**\n` +
-                `\`/tagrole set role:@role\`\n` +
-                `*AURA will automatically read the server's tag and award the role!*`
+                `No tag role was detected on **${guild.name}**.\n\n` +
+                `**To enable it:**\n` +
+                `• Run \`/tagrole set role:@role\`\n` +
+                `• Or create a role named **Tag**, **Tag Supporter**, or **Loyal** and run \`/tagrole set\`!\n` +
+                `*AURA will automatically read this server's tag and award the role!*`
               )
               .setTimestamp()
           ]
         });
       }
 
-      const role = guild.roles.cache.get(config.roleId);
-      const membersWithRole = role ? role.members.size : 0;
-      const detectedTags = tagRoleService.getServerTags(guild, config.tag);
+      const membersWithRole = role.members.size;
+      const isAuto = !settings?.tagRole?.roleId;
 
       const embed = new EmbedBuilder()
         .setColor(COLORS.PRIMARY)
         .setTitle(`🏷️ Server Tag Auto-Role — ${guild.name}`)
         .setDescription(
           `Members with this server's tag automatically receive the reward role, and lose it when the tag is removed.\n\n` +
-          `• **Status:** 🟢 **Active**\n` +
+          `• **Status:** 🟢 **Active** ${isAuto ? '*(Auto-Discovered)*' : ''}\n` +
           `• **Detected Server Tag(s):** ${detectedTags.map(t => `\`${t}\``).join(', ')}\n` +
-          `• **Awarded Role:** ${role ? `<@&${role.id}> (\`${role.name}\`)` : `⚠️ *Role deleted (\`${config.roleId}\`)*`}\n` +
+          `• **Awarded Role:** <@&${role.id}> (\`${role.name}\`)\n` +
           `• **Members with Tag Role:** **${membersWithRole}** members\n` +
-          `• **Announcement Channel:** ${config.channelId ? `<#${config.channelId}>` : '*None*'}`
+          `• **Announcement Channel:** ${settings?.tagRole?.channelId ? `<#${settings.tagRole.channelId}>` : '*None*'}`
         )
         .setFooter({ text: 'AURA Tag Auto-Role System • Run /tagrole sync anytime to re-scan' })
         .setTimestamp();
@@ -179,10 +196,10 @@ module.exports = {
 
     // 3. SYNC MEMBERS
     if (sub === 'sync') {
-      const config = settings?.tagRole;
-      if (!config?.enabled || !config.roleId) {
+      const role = tagRoleService.resolveTagRole(guild, settings);
+      if (!role) {
         return interaction.reply({
-          content: '❌ Tag auto-role is not configured. Run `/tagrole set role:@role` first!',
+          content: '❌ No tag role found on this server. Run `/tagrole set role:@role` first!',
           ephemeral: true
         });
       }
@@ -195,7 +212,7 @@ module.exports = {
       }
 
       const { scanned, added, removed, unchanged, errors } = result.stats;
-      const detectedTags = tagRoleService.getServerTags(guild, config.tag);
+      const detectedTags = tagRoleService.getServerTags(guild, settings?.tagRole?.tag, role);
 
       const embed = new EmbedBuilder()
         .setColor(COLORS.SUCCESS)
@@ -206,7 +223,7 @@ module.exports = {
           `• ➖ **Roles Revoked:** **${removed}** members *(removed tag)*\n` +
           `• ⚖️ **Unchanged:** **${unchanged}** members\n` +
           (errors > 0 ? `• ⚠️ **Errors:** **${errors}** *(role hierarchy or missing permissions)*\n` : '') +
-          `\n*Target Role: <@&${config.roleId}>*`
+          `\n*Target Role: <@&${role.id}>*`
         )
         .setFooter({ text: `Synced by ${interaction.user.username}` })
         .setTimestamp();
@@ -241,28 +258,28 @@ module.exports = {
 
     // +tagrole view / status
     if (action === 'view' || action === 'status' || action === 'list') {
-      const config = settings?.tagRole;
-      if (!config?.enabled || !config.roleId) {
+      const role = tagRoleService.resolveTagRole(guild, settings);
+      const customTag = settings?.tagRole?.tag || null;
+      const detectedTags = tagRoleService.getServerTags(guild, customTag, role);
+
+      if (!role) {
         return message.reply(
-          `🏷️ **Server Tag Auto-Role is currently disabled.**\n` +
-          `• **To configure:** \`+tagrole set @role\` *(auto-detects server tag)*\n` +
-          `• **Example:** \`+tagrole set @Supporter\``
+          `🏷️ **Server Tag Auto-Role is not configured.**\n` +
+          `• **To configure:** \`+tagrole set [@role]\` *(auto-detects server tag)*\n` +
+          `• **Example:** \`+tagrole set @Supporter\` or simply \`+tagrole set\``
         );
       }
 
-      const role = guild.roles.cache.get(config.roleId);
-      const membersWithRole = role ? role.members.size : 0;
-      const detectedTags = tagRoleService.getServerTags(guild, config.tag);
-
+      const membersWithRole = role.members.size;
       const embed = new EmbedBuilder()
         .setColor(COLORS.PRIMARY)
         .setTitle(`🏷️ Server Tag Auto-Role — ${guild.name}`)
         .setDescription(
           `• **Status:** 🟢 **Active**\n` +
           `• **Detected Server Tag(s):** ${detectedTags.map(t => `\`${t}\``).join(', ')}\n` +
-          `• **Awarded Role:** ${role ? `<@&${role.id}>` : `⚠️ *Missing role (\`${config.roleId}\`)*`}\n` +
+          `• **Awarded Role:** <@&${role.id}> (\`${role.name}\`)\n` +
           `• **Members with Role:** **${membersWithRole}**\n` +
-          `• **Channel:** ${config.channelId ? `<#${config.channelId}>` : '*None*'}\n\n` +
+          `• **Channel:** ${settings?.tagRole?.channelId ? `<#${settings.tagRole.channelId}>` : '*None*'}\n\n` +
           `*To sync all members now: \`+tagrole sync\`*`
         )
         .setFooter({ text: 'AURA Tag Auto-Role System' })
@@ -273,9 +290,9 @@ module.exports = {
 
     // +tagrole sync
     if (action === 'sync') {
-      const config = settings?.tagRole;
-      if (!config?.enabled || !config.roleId) {
-        return message.reply('❌ Tag auto-role is not configured. Run `+tagrole set @role` first.');
+      const role = tagRoleService.resolveTagRole(guild, settings);
+      if (!role) {
+        return message.reply('❌ No tag role found on this server. Run `+tagrole set [@role]` first.');
       }
 
       const syncMsg = await message.reply('🔄 Scanning server members and checking server tags...');
@@ -302,7 +319,7 @@ module.exports = {
       return message.reply('🔓 Server Tag Auto-Role has been disabled.');
     }
 
-    // +tagrole set @role [#channel] OR +tagrole @role
+    // +tagrole set [@role] [#channel]
     let role = message.mentions.roles.first();
     let channel = message.mentions.channels.first();
 
@@ -313,11 +330,16 @@ module.exports = {
       }
     }
 
+    // Auto-detect if no role was provided
+    if (!role) {
+      role = tagRoleService.resolveTagRole(guild, settings);
+    }
+
     if (!role) {
       return message.reply(
         '🏷️ **Server Tag Auto-Role Setup:**\n' +
-        '• **Usage:** `+tagrole set @role [#channel]`\n' +
-        '• **Example:** `+tagrole set @Supporter`\n' +
+        '• **Usage:** `+tagrole set [@role] [#channel]`\n' +
+        '• **Example:** `+tagrole set @Supporter` or `+tagrole set`\n' +
         '*(AURA automatically reads this server\'s tag and awards the role to anyone holding it!)*'
       );
     }
@@ -338,7 +360,7 @@ module.exports = {
       channelId: channel?.id || null
     });
 
-    const detectedTags = tagRoleService.getServerTags(guild);
+    const detectedTags = tagRoleService.getServerTags(guild, null, role);
     const syncMsg = await message.reply(
       `🏷️ **Server Tag Auto-Role Activated!**\n` +
       `• **Target Role:** <@&${role.id}>\n` +
@@ -350,7 +372,7 @@ module.exports = {
       tagRole: { enabled: true, tag: null, roleId: role.id, channelId: channel?.id }
     }, client);
 
-    const stats = syncResult.stats || { scanned: 0, added: 0, unchanged: 0 };
+    const stats = syncResult.stats || { scanned: 0, added: 0, removed: 0, unchanged: 0 };
     return syncMsg.edit(
       `🏷️ **Server Tag Auto-Role Activated & Synced!**\n` +
       `• **Role:** <@&${role.id}>\n` +

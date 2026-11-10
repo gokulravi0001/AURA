@@ -606,7 +606,7 @@ test('Features: Server Tag Auto-Role System (/tagrole)', async () => {
   assert.strictEqual(json.name, 'tagrole');
   const setSub = json.options.find(o => o.name === 'set');
   assert.ok(setSub, 'Subcommand set must exist');
-  assert.strictEqual(setSub.options.find(o => o.name === 'role').required, true, 'Role option must be required');
+  assert.strictEqual(setSub.options.find(o => o.name === 'role')?.required || false, false, 'Role option should be optional for auto-detection');
   assert.strictEqual(setSub.options.find(o => o.name === 'tag')?.required || false, false, 'Tag option must be optional');
   assert.ok(json.options.find(o => o.name === 'view'));
   assert.ok(json.options.find(o => o.name === 'sync'));
@@ -617,6 +617,18 @@ test('Features: Server Tag Auto-Role System (/tagrole)', async () => {
   const detectedTags = tagRoleService.getServerTags(therilaGuild);
   assert.ok(detectedTags.includes('therila'), 'Must auto-detect therila from 𝖳𝗁𝖾𝗋𝗂𝗅𝖺 ✧');
   assert.ok(detectedTags.includes('therla'), 'Must include phonetic variant therla');
+  assert.ok(detectedTags.includes('✧'), 'Must include symbol ✧');
+
+  // Test universal tag detection with AURA TAMIL and stylized Lambda (𝚲)
+  const auraGuild = { name: '𝘼𝙐𝙍𝘼 𝙏𝘼𝙈𝙄𝙇' };
+  const auraRole = { name: '𝗔𝗨𝗥𝗔' };
+  const auraDetectedTags = tagRoleService.getServerTags(auraGuild, null, auraRole);
+  assert.ok(auraDetectedTags.includes('aura'), 'Must include aura');
+  assert.ok(auraDetectedTags.includes('𝚲') || auraDetectedTags.includes('λ'), 'Must include Lambda variant');
+
+  // Test hasTag with Lambda nickname in AURA TAMIL
+  const userMember = { nickname: '𝚲・𝗞 𝗨 𝗥 𝗔 𝗜' };
+  assert.strictEqual(tagRoleService.hasTag(userMember, auraGuild, null, auraRole), true, 'User nickname with 𝚲 must match AURA tag');
 
   // Test hasTag matching with auto-detected server tags
   const mockGuild = {

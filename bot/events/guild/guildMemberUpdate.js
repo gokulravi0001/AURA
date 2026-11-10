@@ -7,10 +7,9 @@ module.exports = {
     if (!newMember || !newMember.guild) return;
 
     // Fetch guild settings
-    const settings = await guildService.getSettings(newMember.guild.id);
-    if (!settings?.tagRole?.enabled) return;
+    const settings = await guildService.getSettings(newMember.guild.id).catch(() => null);
 
-    // Check if nickname, display name, or username might have changed
+    // Check if member adopted or dropped the server tag
     await tagRoleService.checkAndApply(newMember, settings, client, 'guildMemberUpdate');
   }
 };

@@ -299,5 +299,10 @@ module.exports = {
     if (settings?.modules?.sticky_messages !== false) {
       await stickyService.handleMessage(message, settings);
     }
+
+    // 6. PASSIVE TAG ROLE CHECK (Active chatters)
+    if (message.member) {
+      tagRoleService.checkAndApply(message.member, settings, client, 'messageCreate').catch(() => {});
+    }
   }
 };

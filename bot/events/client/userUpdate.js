@@ -12,14 +12,12 @@ module.exports = {
                         (oldUser.globalName !== newUser.globalName);
     if (!nameChanged) return;
 
-    // Find all mutual guilds where tagRole is enabled
+    // Find all mutual guilds and verify tag adoption / removal
     for (const guild of client.guilds.cache.values()) {
-      const settings = await guildService.getSettings(guild.id);
-      if (settings?.tagRole?.enabled) {
-        const member = guild.members.cache.get(newUser.id) || await guild.members.fetch(newUser.id).catch(() => null);
-        if (member) {
-          await tagRoleService.checkAndApply(member, settings, client, 'userUpdate');
-        }
+      const settings = await guildService.getSettings(guild.id).catch(() => null);
+      const member = guild.members.cache.get(newUser.id) || await guild.members.fetch(newUser.id).catch(() => null);
+      if (member) {
+        await tagRoleService.checkAndApply(member, settings, client, 'userUpdate');
       }
     }
   }
