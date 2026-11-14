@@ -46,6 +46,11 @@ export default function CommandsList() {
     { name: 'ticket add', slash: '/ticket add <user>', prefix: '+ticket add @user', category: 'Tickets', desc: 'Add a user to this ticket channel', perm: 'Ticket Staff' },
 
     // Moderation & Counters
+    { name: 'invites prelog', slash: '/invites prelog [enabled] [channel]', prefix: '+inv prelog [on|off] [#channel]', category: 'Moderation', desc: 'Log who invited new members immediately before they accept the server application or rules', perm: 'Administrator' },
+    { name: 'servertag set', slash: '/servertag set <role> [include_bots]', prefix: '+servertag set @role', category: 'Moderation', desc: 'Set the role automatically granted/revoked for members wearing this server\'s Discord Server Tag', perm: 'Administrator' },
+    { name: 'servertag on / off', slash: '/servertag on | /servertag off', prefix: '+servertag on / +servertag off', category: 'Moderation', desc: 'Turn Server Tag Auto Role ON or OFF while keeping your role saved', perm: 'Administrator' },
+    { name: 'servertag status', slash: '/servertag status', prefix: '+servertag status', category: 'Moderation', desc: 'View Server Tag Auto Role status, detected tag, and member count', perm: 'Administrator' },
+    { name: 'servertag sync', slash: '/servertag sync', prefix: '+servertag sync', category: 'Moderation', desc: 'Immediately synchronize Server Tag roles across server members', perm: 'Administrator' },
     { name: 'sticky set', slash: '/sticky set <text> [title] [channel]', prefix: '+sticky <text>', category: 'Moderation', desc: 'Set or update a sticky message in the channel', perm: 'Manage Messages' },
     { name: 'sticky list', slash: '/sticky list', prefix: '+sticky list', category: 'Moderation', desc: 'List all channels with active sticky messages', perm: 'Manage Messages' },
     { name: 'sticky remove', slash: '/sticky remove [channel]', prefix: '+sticky remove', category: 'Moderation', desc: 'Remove the sticky message from the channel', perm: 'Manage Messages' },

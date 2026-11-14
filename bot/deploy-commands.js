@@ -41,21 +41,21 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN)
       { body: commands }
     );
 
-    // 2. Register commands directly to all joined guilds for INSTANT (0-second) availability
+    // 2. Clear guild-specific commands to eliminate duplicate commands in the Discord UI
     try {
       const guilds = await rest.get(Routes.userGuilds());
-      logger.info(`Deploying instant slash commands to ${guilds.length} guilds...`);
+      logger.info(`Clearing duplicate guild commands across ${guilds.length} guilds...`);
 
       for (const guild of guilds) {
         try {
-          await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: commands });
-          logger.success(`✓ Instant slash commands active for: ${guild.name} (${guild.id})`);
+          await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: [] });
+          logger.success(`✓ Removed duplicate guild commands for: ${guild.name} (${guild.id})`);
         } catch (e) {
-          logger.warn(`Could not deploy guild commands for ${guild.name}:`, e.message);
+          logger.warn(`Could not clear guild commands for ${guild.name}:`, e.message);
         }
       }
     } catch (err) {
-      logger.warn('Could not inspect guilds for direct deployment:', err.message);
+      logger.warn('Could not inspect guilds for command cleanup:', err.message);
     }
 
     logger.success(`=================================================`);

@@ -6,6 +6,7 @@ const stickyService = require('../../modules/stickyService');
 const inviteService = require('../../modules/inviteService');
 const whitelistService = require('../../../shared/whitelistService');
 const autoDeleteService = require('../../../shared/autoDeleteService');
+const serverTagService = require('../../modules/serverTagService');
 
 module.exports = {
   name: 'ready',
@@ -41,7 +42,10 @@ module.exports = {
         await guild.members.fetch().catch(() => {});
       }
 
-      logger.info('Background schedulers & caches initialized (Birthdays, Bump Reminders, Sticky Messages, Invites, Guild Members).');
+      // Start Server Tag Auto Role periodic + startup sync after member caches settle
+      serverTagService.init(client);
+
+      logger.info('Background schedulers & caches initialized (Birthdays, Bump Reminders, Sticky Messages, Invites, Server Tag Roles, Guild Members).');
     } catch (err) {
       logger.error('Error starting background schedulers:', err.message);
     }

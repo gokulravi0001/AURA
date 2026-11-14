@@ -3,21 +3,38 @@ const logger = require('../../shared/logger');
 
 const getTodayString = () => new Date().toISOString().split('T')[0];
 
+// In-memory buffer to batch message count updates and avoid MongoDB roundtrip delays on every message
+const messageBuffer = new Map();
+let flushTimer = null;
+
+async function flushMessageBuffer() {
+  if (messageBuffer.size === 0) return;
+  const today = getTodayString();
+  const entries = Array.from(messageBuffer.entries());
+  messageBuffer.clear();
+
+  for (const [guildId, count] of entries) {
+    if (!count) continue;
+    ServerStats.updateOne(
+      { guildId, date: today },
+      { $inc: { messagesRecorded: count } },
+      { upsert: true }
+    ).catch(() => {});
+  }
+}
+
+// Flush every 10 seconds
+flushTimer = setInterval(flushMessageBuffer, 10000);
+if (flushTimer.unref) flushTimer.unref();
+
 const statsService = {
   /**
-   * Record message event
+   * Record message event (buffered in-memory for 0ms delay)
    */
-  async recordMessage(guildId) {
-    try {
-      const today = getTodayString();
-      await ServerStats.updateOne(
-        { guildId, date: today },
-        { $inc: { messagesRecorded: 1 } },
-        { upsert: true }
-      );
-    } catch (err) {
-      // Non-critical background task
-    }
+  recordMessage(guildId) {
+    if (!guildId) return;
+    const current = messageBuffer.get(guildId) || 0;
+    messageBuffer.set(guildId, current + 1);
   },
 
   /**

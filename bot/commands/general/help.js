@@ -52,7 +52,7 @@ function buildHelpEmbed(prefix, client) {
       },
       {
         name: '📈 Server Counters & Invite Tracker',
-        value: `\`${prefix}inv [@user]\` • \`${prefix}inv top\` • \`${prefix}inv setup <#chan>\` • \`${prefix}counter setup\` • \`${prefix}counter update\``
+        value: `\`${prefix}inv [@user]\` • \`${prefix}inv top\` • \`${prefix}inv setup <#chan> [#app-log]\` • \`${prefix}inv prelog [on|off]\` • \`${prefix}counter setup\`\n*Tracks joins/leaves, top inviters, and logs who invited applicants before they accept the server application!*`
       },
       {
         name: '🎮 Games & Bumping',
@@ -87,8 +87,8 @@ function buildHelpEmbed(prefix, client) {
         value: `\`/autodlt target:@user duration:<time>\` • \`${prefix}autodlt @user <duration>\` • \`${prefix}autodlt stop @user\` • \`${prefix}autodlt list\`\n*Allows target user to send messages, but automatically deletes every message they send within a second for the specified duration (e.g. 30s, 5m, 1h)!*`
       },
       {
-        name: '🏷️ Server Tag Auto-Role (/tagrole)',
-        value: `\`${prefix}tagrole set <tag> @role [#channel]\` • \`${prefix}tagrole sync\` • \`${prefix}tagrole view\` • \`${prefix}tagrole disable\`\n*Automatically awards a role to anyone who adds your server tag (e.g. \`therla\`, \`[therla]\`) to their nickname or username! Also removes it if they drop the tag.*`
+        name: '🏷️ Server Tag Auto Role (/servertag)',
+        value: `\`/servertag set role:@role\` • \`/servertag on\` • \`/servertag off\` • \`/servertag status\` • \`/servertag sync\`\n*Prefix: \`${prefix}servertag set @role\` • \`${prefix}servertag off\` • \`${prefix}servertag on\` — Automatically assigns/removes your chosen role using Discord's official Server Tag identity!*`
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })

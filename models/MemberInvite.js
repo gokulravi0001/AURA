@@ -5,7 +5,9 @@ const MemberInviteSchema = new mongoose.Schema({
   memberId: { type: String, required: true, index: true },
   inviterId: { type: String, default: null, index: true },
   code: { type: String, default: null },
-  isFake: { type: Boolean, default: false }
+  isFake: { type: Boolean, default: false },
+  pending: { type: Boolean, default: false },
+  acceptedAt: { type: Date, default: null }
 }, {
   timestamps: true
 });

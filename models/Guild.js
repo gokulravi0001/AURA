@@ -21,7 +21,8 @@ const GuildSchema = new mongoose.Schema({
     bump_reminder: { type: Boolean, default: true },
     invite_tracker: { type: Boolean, default: true },
     emoji_manager: { type: Boolean, default: true },
-    invite_guard: { type: Boolean, default: true }
+    invite_guard: { type: Boolean, default: true },
+    server_tag_role: { type: Boolean, default: true }
   },
 
   leveling: {
@@ -117,6 +118,8 @@ const GuildSchema = new mongoose.Schema({
   inviteTracker: {
     enabled: { type: Boolean, default: true },
     channelId: { type: String, default: null },
+    logPreScreening: { type: Boolean, default: true },
+    applicationChannelId: { type: String, default: null },
     joinMessage: { type: String, default: '👋 Welcome {user} to **{server}**! Invited by **{inviter}** (**{total}** invites) using code `{code}`.' },
     leaveMessage: { type: String, default: '📤 **{user}** left the server. Invited by **{inviter}** (**{total}** invites).' }
   },
@@ -148,6 +151,28 @@ const GuildSchema = new mongoose.Schema({
       expiresAt: { type: Date, default: null },
       createdBy: { type: String, default: null }
     }]
+  },
+
+  serverTagRole: {
+    enabled: { type: Boolean, default: false },
+    roleId: { type: String, default: null },
+    serverTagId: { type: String, default: null },
+    detectedTag: { type: String, default: null },
+    detectedBadge: { type: String, default: null },
+    includeBots: { type: Boolean, default: false },
+    activeMemberCount: { type: Number, default: 0 },
+    lastSyncAt: { type: Date, default: null },
+    lastSyncStatus: { type: String, enum: ['idle', 'syncing', 'success', 'partial', 'error'], default: 'idle' },
+    lastSyncMessage: { type: String, default: null },
+    lastSyncStats: {
+      checked: { type: Number, default: 0 },
+      assigned: { type: Number, default: 0 },
+      removed: { type: Number, default: 0 },
+      skippedUnverified: { type: Number, default: 0 },
+      errors: { type: Number, default: 0 }
+    },
+    updatedBy: { type: String, default: null },
+    updatedAt: { type: Date, default: null }
   }
 }, {
   timestamps: true

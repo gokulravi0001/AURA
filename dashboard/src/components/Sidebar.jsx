@@ -11,6 +11,7 @@ import {
   Pin,
   MessageSquareShare,
   Flame,
+  Tag,
   Terminal,
   Settings,
   ArrowLeft
@@ -30,6 +31,7 @@ export default function Sidebar({ guildName, guildIcon }) {
     { label: 'Sticky Messages', icon: Pin, path: `/servers/${guildId}/sticky` },
     { label: 'Image Threads', icon: MessageSquareShare, path: `/servers/${guildId}/threads` },
     { label: 'Bump Settings', icon: Flame, path: `/servers/${guildId}/bump` },
+    { label: 'Server Tag Role', icon: Tag, path: `/servers/${guildId}/server-tag-role` },
     { label: 'Commands & Docs', icon: Terminal, path: `/servers/${guildId}/commands` },
     { label: 'Bot Settings', icon: Settings, path: `/servers/${guildId}/settings` }
   ];

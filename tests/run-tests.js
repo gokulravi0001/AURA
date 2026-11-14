@@ -592,10 +592,593 @@ test('Features: Auto-Delete & Shadow-Mute System (/autodlt)', async () => {
   await autoDeleteService.clearAll('guild_test_1');
 });
 
-console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
-if (failed > 0) {
-  process.exit(1);
-} else {
-  console.log('\x1b[32m✔ All tests passed successfully!\x1b[0m\n');
-  process.exit(0);
+async function asyncTest(name, fn) {
+  try {
+    await fn();
+    console.log(`  \x1b[32m✔\x1b[0m ${name}`);
+    passed++;
+  } catch (err) {
+    console.error(`  \x1b[31m✖\x1b[0m ${name}`);
+    console.error(`    ${err.message}`);
+    failed++;
+  }
 }
+
+function createCollectionMap(entries = []) {
+  const map = new Map(entries);
+  map.filter = (predicate) => {
+    const filtered = new Map();
+    for (const [k, v] of map.entries()) {
+      if (predicate(v, k, map)) filtered.set(k, v);
+    }
+    filtered.size;
+    return createCollectionMap(Array.from(filtered.entries()));
+  };
+  return map;
+}
+
+function createServerTagTestContext(options = {}) {
+  const guildId = options.guildId || 'guild_aura_1';
+  const botId = options.botId || 'bot_aura_1';
+  const tagRoleId = options.tagRoleId || 'role_aura_member';
+  const secondRoleId = options.secondRoleId || 'role_aura_vip';
+  const unrelatedRoleId = options.unrelatedRoleId || 'role_booster';
+  const managedRoleId = options.managedRoleId || 'role_managed_bot';
+  const highRoleId = options.highRoleId || 'role_owner';
+
+  const apiCalls = { added: [], removed: [] };
+
+  const rolesCache = createCollectionMap([
+    [guildId, { id: guildId, name: '@everyone', position: 0, managed: false }],
+    [tagRoleId, { id: tagRoleId, name: 'AURA Member', position: 5, managed: false }],
+    [secondRoleId, { id: secondRoleId, name: 'AURA VIP', position: 6, managed: false }],
+    [unrelatedRoleId, { id: unrelatedRoleId, name: 'Server Booster', position: 4, managed: false }],
+    [managedRoleId, { id: managedRoleId, name: 'Bot Integration', position: 3, managed: true }],
+    [highRoleId, { id: highRoleId, name: 'Server Owner', position: 25, managed: false }]
+  ]);
+
+  let hasManageRoles = options.hasManageRoles !== undefined ? options.hasManageRoles : true;
+  let botPosition = options.botPosition !== undefined ? options.botPosition : 15;
+
+  const botMember = {
+    id: botId,
+    permissions: {
+      has: (flag) => {
+        const { PermissionsBitField } = require('discord.js');
+        if (flag === PermissionsBitField.Flags.ManageRoles) return hasManageRoles;
+        return true;
+      }
+    },
+    roles: {
+      highest: { position: botPosition, name: 'AURA Bot' }
+    }
+  };
+
+  function makeMember({ id, tag = null, identityGuildId = null, identityEnabled = false, verified = true, initialRoles = [], isBot = false }) {
+    const roleSet = createCollectionMap(initialRoles.map(rid => [rid, rolesCache.get(rid) || { id: rid, name: rid }]));
+    const memberObj = {
+      id,
+      _primaryGuildVerified: verified,
+      guild: null,
+      user: {
+        id,
+        bot: isBot,
+        username: `user_${id}`,
+        primaryGuild: identityGuildId !== null
+          ? { identityGuildId, identityEnabled, tag, badge: identityGuildId ? 'badge_hash_1' : null }
+          : null
+      },
+      roles: {
+        cache: roleSet,
+        add: async (role) => {
+          const rId = typeof role === 'string' ? role : role.id;
+          apiCalls.added.push({ memberId: id, roleId: rId });
+          roleSet.set(rId, rolesCache.get(rId) || { id: rId, name: rId });
+        },
+        remove: async (role) => {
+          const rId = typeof role === 'string' ? role : role.id;
+          apiCalls.removed.push({ memberId: id, roleId: rId });
+          roleSet.delete(rId);
+        }
+      }
+    };
+    return memberObj;
+  }
+
+  const membersCache = createCollectionMap();
+  const guild = {
+    id: guildId,
+    name: 'AURA Community',
+    features: options.features || ['GUILD_TAGS'],
+    roles: { cache: rolesCache },
+    members: {
+      me: botMember,
+      cache: membersCache,
+      fetch: async () => membersCache,
+      fetchMe: async () => botMember
+    }
+  };
+
+  const client = {
+    user: { id: botId },
+    guilds: { cache: createCollectionMap([[guildId, guild]]) },
+    users: { cache: createCollectionMap() },
+    rest: options.rest || null,
+    io: null
+  };
+  guild.client = client;
+
+  const settings = {
+    guildId,
+    modules: { server_tag_role: true },
+    serverTagRole: {
+      enabled: true,
+      roleId: tagRoleId,
+      includeBots: false,
+      serverTagId: guildId,
+      serverTagName: null,
+      activeMemberCount: 0,
+      lastSyncStatus: 'never'
+    }
+  };
+
+  function addMemberToGuild(cfg) {
+    const m = makeMember(cfg);
+    m.guild = guild;
+    membersCache.set(m.id, m);
+    client.users.cache.set(m.id, m.user);
+    return m;
+  }
+
+  return {
+    guild,
+    client,
+    settings,
+    apiCalls,
+    rolesCache,
+    membersCache,
+    tagRoleId,
+    secondRoleId,
+    unrelatedRoleId,
+    managedRoleId,
+    highRoleId,
+    addMemberToGuild,
+    setHasManageRoles: (val) => { hasManageRoles = val; }
+  };
+}
+
+(async () => {
+  const serverTagService = require('../bot/modules/serverTagService');
+  const guildService = require('../shared/guildService');
+  const userUpdateEvent = require('../bot/events/client/userUpdate');
+  const guildMemberRemoveEvent = require('../bot/events/guild/guildMemberRemove');
+  const rawEvent = require('../bot/events/client/raw');
+
+  const originalGetSettings = guildService.getSettings;
+  const originalUpdateSettings = guildService.updateSettings;
+
+  // Scenario 1, 2 & 3: Adopt AURA tag, remove tag, or switch to another server's tag
+  await asyncTest('ServerTag Scen 1-3: Adopt AURA tag -> add role, remove/switch tag -> remove ONLY tag role', async () => {
+    serverTagService._clearVerificationCache();
+    const ctx = createServerTagTestContext();
+    guildService.getSettings = async () => ctx.settings;
+    guildService.updateSettings = async (gId, data) => ctx.settings;
+
+    const member = ctx.addMemberToGuild({
+      id: 'mem_1',
+      identityGuildId: null,
+      verified: true,
+      initialRoles: [ctx.unrelatedRoleId]
+    });
+
+    // Simulate userUpdate event when member adopts AURA tag
+    const oldUser = { id: 'mem_1', partial: false, primaryGuild: null };
+    member.user.primaryGuild = {
+      identityGuildId: ctx.guild.id,
+      identityEnabled: true,
+      tag: 'AURA',
+      badge: 'badge_aura'
+    };
+
+    await userUpdateEvent.execute(oldUser, member.user, ctx.client);
+    assert.strictEqual(member.roles.cache.has(ctx.tagRoleId), true, 'AURA Member role should be added on tag adoption');
+    assert.strictEqual(member.roles.cache.has(ctx.unrelatedRoleId), true, 'Unrelated role must remain untouched');
+
+    // Simulate Scenario 3: member switches to another server's tag
+    const prevUserSnap = {
+      id: 'mem_1',
+      partial: false,
+      primaryGuild: { ...member.user.primaryGuild }
+    };
+    member.user.primaryGuild = {
+      identityGuildId: 'other_guild_999',
+      identityEnabled: true,
+      tag: 'OTHR',
+      badge: 'badge_other'
+    };
+
+    await userUpdateEvent.execute(prevUserSnap, member.user, ctx.client);
+    assert.strictEqual(member.roles.cache.has(ctx.tagRoleId), false, 'AURA role must be removed when switching to another server tag');
+    assert.strictEqual(member.roles.cache.has(ctx.unrelatedRoleId), true, 'Unrelated role must still be untouched');
+
+    // Re-adopt via raw packet tracking (camelCase & snake_case) and then remove tag completely (null)
+    member.user.primaryGuild = { identityGuildId: ctx.guild.id, identityEnabled: true, tag: 'AURA', badge: 'b1' };
+    await serverTagService.syncMember(member, ctx.settings, ctx.client, { source: 'test' });
+    assert.strictEqual(member.roles.cache.has(ctx.tagRoleId), true);
+
+    // Simulate Scenario 2: member disables/removes tag (`primary_guild: null` verified via raw USER_UPDATE)
+    await rawEvent.execute({
+      t: 'USER_UPDATE',
+      d: { id: 'mem_1', primary_guild: null }
+    }, ctx.client);
+    const snap2 = {
+      id: 'mem_1',
+      partial: false,
+      primaryGuild: { identityGuildId: ctx.guild.id, identityEnabled: true, tag: 'AURA', badge: 'b1' }
+    };
+    member.user.primaryGuild = null;
+    await userUpdateEvent.execute(snap2, member.user, ctx.client);
+    assert.strictEqual(member.roles.cache.has(ctx.tagRoleId), false, 'AURA role must be removed when tag is removed');
+    assert.strictEqual(member.roles.cache.has(ctx.unrelatedRoleId), true, 'Unrelated role must remain intact');
+  });
+
+  // Scenario 4 & 5: Member leaves server & Guild Schema persistence across restarts
+  await asyncTest('ServerTag Scen 4-5: Member leave handled safely & Guild schema persists config', async () => {
+    const ctx = createServerTagTestContext();
+    ctx.settings.modules.invite_tracker = false; // isolate from MongoDB MemberInvite query in unit test
+    let persistedCount = null;
+    const origUpdateOne = Guild.updateOne;
+    guildService.getSettings = async () => ctx.settings;
+    Guild.updateOne = async (query, update) => {
+      if (update?.$set?.['serverTagRole.activeMemberCount'] !== undefined) {
+        persistedCount = update.$set['serverTagRole.activeMemberCount'];
+      }
+      return { acknowledged: true, modifiedCount: 1 };
+    };
+
+    const leavingMember = ctx.addMemberToGuild({
+      id: 'mem_leave',
+      identityGuildId: ctx.guild.id,
+      identityEnabled: true,
+      tag: 'AURA',
+      initialRoles: [ctx.tagRoleId]
+    });
+    const remainingMember = ctx.addMemberToGuild({
+      id: 'mem_stay',
+      identityGuildId: ctx.guild.id,
+      identityEnabled: true,
+      tag: 'AURA',
+      initialRoles: [ctx.tagRoleId]
+    });
+
+    // Simulate member leaving (handled cleanly whether already removed from cache or not)
+    ctx.membersCache.delete(leavingMember.id);
+    await guildMemberRemoveEvent.execute(leavingMember, ctx.client);
+    Guild.updateOne = origUpdateOne;
+    assert.strictEqual(persistedCount, 1, 'Remaining active member count should exclude departed member safely');
+    assert.strictEqual(remainingMember.roles.cache.has(ctx.tagRoleId), true);
+
+    // Scenario 5: Database schema defaults & persistence on Guild model
+    const guildDoc = new Guild({
+      guildId: 'restart_guild_1',
+      serverTagRole: {
+        enabled: true,
+        roleId: 'role_999',
+        serverTagId: 'restart_guild_1',
+        detectedTag: 'AURA',
+        includeBots: false,
+        activeMemberCount: 1
+      }
+    });
+    assert.strictEqual(guildDoc.modules.server_tag_role, true);
+    assert.strictEqual(guildDoc.serverTagRole.enabled, true);
+    assert.strictEqual(guildDoc.serverTagRole.roleId, 'role_999');
+    assert.strictEqual(guildDoc.serverTagRole.detectedTag, 'AURA');
+    assert.strictEqual(guildDoc.serverTagRole.includeBots, false);
+    assert.strictEqual(guildDoc.serverTagRole.activeMemberCount, 1);
+    assert.strictEqual(guildDoc.serverTagRole.lastSyncStatus, 'idle');
+  });
+
+  // Scenario 6 & 9: Temporary disconnect reconciliation + Unverified data safety + Bot exclusion
+  await asyncTest('ServerTag Scen 6 & 9: Sync restores missed events, respects rate/no-ops, never removes unverified roles', async () => {
+    serverTagService._clearVerificationCache();
+    const ctx = createServerTagTestContext();
+    guildService.updateSettings = async () => ctx.settings;
+
+    // 1) Adopter missed event during disconnect (no role yet -> should receive role)
+    const missedAdopt = ctx.addMemberToGuild({
+      id: 'mem_adopt',
+      identityGuildId: ctx.guild.id,
+      identityEnabled: true,
+      tag: 'AURA',
+      verified: true,
+      initialRoles: []
+    });
+    // 2) Remover missed event during disconnect (verified no tag, still has role -> should lose ONLY tag role)
+    const missedRemove = ctx.addMemberToGuild({
+      id: 'mem_remove',
+      identityGuildId: null,
+      verified: true,
+      initialRoles: [ctx.tagRoleId, ctx.unrelatedRoleId]
+    });
+    // 3) Unverified member whose primary_guild data is unavailable (verified: false, REST unavailable) -> MUST KEEP role!
+    const unverifiedMember = ctx.addMemberToGuild({
+      id: 'mem_unverified',
+      identityGuildId: null,
+      verified: false,
+      initialRoles: [ctx.tagRoleId]
+    });
+    // 4) Already-correct member -> must NOT trigger redundant Discord API calls
+    const alreadySynced = ctx.addMemberToGuild({
+      id: 'mem_ok',
+      identityGuildId: ctx.guild.id,
+      identityEnabled: true,
+      tag: 'AURA',
+      verified: true,
+      initialRoles: [ctx.tagRoleId]
+    });
+    // 5) Bot account wearing tag when includeBots is false -> excluded from auto-role
+    const botMember = ctx.addMemberToGuild({
+      id: 'bot_1',
+      isBot: true,
+      identityGuildId: ctx.guild.id,
+      identityEnabled: true,
+      tag: 'AURA',
+      verified: true,
+      initialRoles: []
+    });
+
+    const syncRes = await serverTagService.syncGuild(ctx.guild, ctx.settings, ctx.client, { source: 'reconnect', force: true });
+    assert.strictEqual(syncRes.success, true);
+    assert.strictEqual(missedAdopt.roles.cache.has(ctx.tagRoleId), true, 'Reconnect sync must grant missed role');
+    assert.strictEqual(missedRemove.roles.cache.has(ctx.tagRoleId), false, 'Reconnect sync must revoke tag role for verified non-wearer');
+    assert.strictEqual(missedRemove.roles.cache.has(ctx.unrelatedRoleId), true, 'Unrelated role must never be removed');
+    assert.strictEqual(unverifiedMember.roles.cache.has(ctx.tagRoleId), true, 'CRITICAL: Unverified tag status must NEVER revoke existing role');
+    assert.strictEqual(alreadySynced.roles.cache.has(ctx.tagRoleId), true);
+    assert.strictEqual(botMember.roles.cache.has(ctx.tagRoleId), false, 'Bots must be excluded unless explicitly configured');
+    assert.strictEqual(ctx.apiCalls.added.length, 1, 'Only 1 role add API call should be made (skip unchanged)');
+    assert.strictEqual(ctx.apiCalls.removed.length, 1, 'Only 1 role remove API call should be made (skip unverified)');
+    assert.strictEqual(syncRes.stats.skippedUnverified, 1);
+  });
+
+  // Scenario 7 & 8: Role config change, role hierarchy/managed checks, and missing Manage Roles permission
+  await asyncTest('ServerTag Scen 7-8: Admin role changes apply cleanly & permission/hierarchy errors are caught', async () => {
+    const ctx = createServerTagTestContext();
+    guildService.updateSettings = async () => ctx.settings;
+
+    const tagHolder = ctx.addMemberToGuild({
+      id: 'mem_holder',
+      identityGuildId: ctx.guild.id,
+      identityEnabled: true,
+      tag: 'AURA',
+      verified: true,
+      initialRoles: [ctx.tagRoleId]
+    });
+
+    // Admin validates managed role & high role -> rejected clearly
+    const managedCheck = await serverTagService.validateRoleConfiguration(ctx.guild, ctx.managedRoleId);
+    assert.strictEqual(managedCheck.valid, false);
+    assert.strictEqual(managedCheck.code, 'MANAGED_ROLE');
+
+    const highCheck = await serverTagService.validateRoleConfiguration(ctx.guild, ctx.highRoleId);
+    assert.strictEqual(highCheck.valid, false);
+    assert.strictEqual(highCheck.code, 'ROLE_HIERARCHY');
+
+    // Admin changes configured role to secondRoleId -> new role is applied cleanly
+    ctx.settings.serverTagRole.roleId = ctx.secondRoleId;
+    const syncRes = await serverTagService.syncGuild(ctx.guild, ctx.settings, ctx.client, { source: 'dashboardSave', force: true });
+    assert.strictEqual(syncRes.success, true);
+    assert.strictEqual(tagHolder.roles.cache.has(ctx.secondRoleId), true, 'Newly configured role must be assigned immediately');
+
+    // Scenario 8: Bot loses Manage Roles permission -> clear error, no crash
+    ctx.setHasManageRoles(false);
+    const permRes = await serverTagService.syncGuild(ctx.guild, ctx.settings, ctx.client, { source: 'manual', force: true });
+    assert.strictEqual(permRes.success, false);
+    assert.strictEqual(permRes.code, 'MISSING_MANAGE_ROLES');
+    assert.ok(permRes.error && permRes.error.includes('Manage Roles'));
+  });
+
+  // Extra Check: Modules registry & /servertag command (set, on, off, status, non-admin check)
+  await asyncTest('ServerTag Integration: Constants, Modules & /servertag command (set/on/off/status)', async () => {
+    assert.strictEqual(MODULES.SERVER_TAG_ROLE, 'server_tag_role');
+    const modulesCmd = require('../bot/commands/general/modules');
+    assert.ok(modulesCmd.MODULE_DEFINITIONS.some(m => m.key === 'server_tag_role'));
+    assert.strictEqual(modulesCmd.MODULE_ALIASES['servertag'], 'server_tag_role');
+
+    const serverTagCmd = require('../bot/commands/moderation/servertag');
+    assert.strictEqual(serverTagCmd.data.name, 'servertag');
+
+    const ctx = createServerTagTestContext();
+    ctx.settings.serverTagRole.enabled = false;
+    ctx.settings.serverTagRole.roleId = null;
+    ctx.guild.ownerId = 'owner_1';
+    ctx.addMemberToGuild({
+      id: 'mem_tag',
+      identityGuildId: ctx.guild.id,
+      identityEnabled: true,
+      tag: 'AURA',
+      verified: true,
+      initialRoles: []
+    });
+
+    guildService.getSettings = async () => ctx.settings;
+    guildService.updateSettings = async (gId, data) => {
+      if (data['modules.server_tag_role'] !== undefined) ctx.settings.modules.server_tag_role = data['modules.server_tag_role'];
+      if (data['serverTagRole.enabled'] !== undefined) ctx.settings.serverTagRole.enabled = data['serverTagRole.enabled'];
+      if (data['serverTagRole.roleId'] !== undefined) ctx.settings.serverTagRole.roleId = data['serverTagRole.roleId'];
+      if (data['serverTagRole.includeBots'] !== undefined) ctx.settings.serverTagRole.includeBots = data['serverTagRole.includeBots'];
+      return ctx.settings;
+    };
+
+    const runSlash = async (sub, opts = {}, isAdmin = true) => {
+      let reply = null;
+      const interaction = {
+        guild: ctx.guild,
+        member: {
+          id: isAdmin ? 'owner_1' : 'regular_99',
+          permissions: { has: () => isAdmin }
+        },
+        options: {
+          getSubcommand: () => sub,
+          getRole: (k) => (k === 'role' ? opts.role || null : null),
+          getBoolean: (k) => (k === 'include_bots' ? opts.includeBots ?? null : null)
+        },
+        deferReply: async () => {},
+        editReply: async (p) => { reply = p; },
+        reply: async (p) => { reply = p; }
+      };
+      await serverTagCmd.execute(interaction, ctx.client, ctx.settings);
+      return reply;
+    };
+
+    // Non-admin blocked
+    const denied = await runSlash('off', {}, false);
+    assert.ok(denied.content && denied.content.includes('Administrator'));
+
+    // Set role -> enables & syncs immediately
+    const setRes = await runSlash('set', { role: { id: ctx.tagRoleId, name: 'AURA Member' } }, true);
+    assert.strictEqual(ctx.settings.serverTagRole.enabled, true);
+    assert.strictEqual(ctx.settings.serverTagRole.roleId, ctx.tagRoleId);
+    assert.ok(setRes.embeds && setRes.embeds.length === 1);
+
+    // Off -> disables while keeping saved role
+    const offRes = await runSlash('off', {}, true);
+    assert.strictEqual(ctx.settings.serverTagRole.enabled, false);
+    assert.strictEqual(ctx.settings.serverTagRole.roleId, ctx.tagRoleId);
+    assert.ok(offRes.embeds && offRes.embeds[0].data.title.includes('Turned OFF'));
+
+    // On -> re-enables with saved role
+    const onRes = await runSlash('on', {}, true);
+    assert.strictEqual(ctx.settings.serverTagRole.enabled, true);
+    assert.ok(onRes.embeds && onRes.embeds[0].data.description.includes('ON'));
+  });
+
+  // Pre-Application Invite Logging & Screening Tests
+  await asyncTest('InviteTracker: Logs who invited who before accepting server application/screening', async () => {
+    const inviteService = require('../bot/modules/inviteService');
+    const MemberInvite = require('../models/MemberInvite');
+    const Invite = require('../models/Invite');
+    const guildMemberUpdateEvent = require('../bot/events/guild/guildMemberUpdate');
+
+    let sentChannelMessages = [];
+    const mockChannel = {
+      id: 'chan_inv_logs',
+      isTextBased: () => true,
+      send: async (payload) => {
+        sentChannelMessages.push(payload);
+        return payload;
+      }
+    };
+
+    const mockGuild = {
+      id: 'guild_inv_test',
+      name: 'Invite Test Community',
+      memberCount: 50,
+      channels: {
+        cache: new Map([['chan_inv_logs', mockChannel]])
+      },
+      invites: {
+        fetch: async () => new Map([
+          ['code_aura', { code: 'code_aura', uses: 5, inviter: { id: 'inviter_99', tag: 'Inviter#0001', username: 'Inviter' } }]
+        ])
+      }
+    };
+
+    const mockSettings = {
+      guildId: 'guild_inv_test',
+      modules: { invite_tracker: true },
+      inviteTracker: {
+        enabled: true,
+        channelId: 'chan_inv_logs',
+        logPreScreening: true,
+        applicationChannelId: null
+      }
+    };
+
+    // Prime the invite cache
+    await inviteService.cacheGuildInvites(mockGuild);
+
+    // Update invite uses to simulate someone joining with code_aura
+    mockGuild.invites.fetch = async () => new Map([
+      ['code_aura', { code: 'code_aura', uses: 6, inviter: { id: 'inviter_99', tag: 'Inviter#0001', username: 'Inviter' } }]
+    ]);
+
+    // 1. Simulate member joining who has NOT yet accepted server rules/application (member.pending === true)
+    const pendingApplicant = {
+      id: 'applicant_1',
+      pending: true,
+      guild: mockGuild,
+      user: {
+        id: 'applicant_1',
+        tag: 'Applicant#1234',
+        bot: false,
+        createdTimestamp: Date.now() - (10 * 24 * 60 * 60 * 1000), // 10 days old (not fake)
+        displayAvatarURL: () => 'https://example.com/avatar.png'
+      }
+    };
+
+    let savedMemberInvite = null;
+    const origFindOneAndUpdate = MemberInvite.findOneAndUpdate;
+    MemberInvite.findOneAndUpdate = async (query, update, opts) => {
+      savedMemberInvite = { ...(savedMemberInvite || {}), ...query, ...update };
+      return savedMemberInvite;
+    };
+    const origFindOne = MemberInvite.findOne;
+    MemberInvite.findOne = async () => savedMemberInvite;
+    const origInviteFindOne = Invite.findOne;
+    const mockInviterRecord = {
+      guildId: 'guild_inv_test',
+      userId: 'inviter_99',
+      regular: 5,
+      bonus: 0,
+      fake: 0,
+      left: 0,
+      get total() { return this.regular + this.bonus - this.left; },
+      save: async () => {}
+    };
+    Invite.findOne = async () => mockInviterRecord;
+
+    await inviteService.handleMemberJoin(pendingApplicant, mockSettings, {});
+
+    // Assert: Inviter was logged immediately, MemberInvite has pending: true
+    assert.strictEqual(savedMemberInvite.inviterId, 'inviter_99');
+    assert.strictEqual(savedMemberInvite.code, 'code_aura');
+    assert.strictEqual(savedMemberInvite.pending, true, 'MemberInvite must record pending: true before screening');
+    assert.ok(sentChannelMessages.length >= 1);
+    const preLogEmbed = sentChannelMessages[0].embeds[0];
+    assert.ok(preLogEmbed.data.title.includes('Application / Screening Pending'));
+    assert.ok(preLogEmbed.data.description.includes('Invited by:'));
+    assert.ok(preLogEmbed.data.description.includes('inviter_99'));
+
+    // 2. Simulate applicant accepting the server application / rules (oldMember.pending: true -> newMember.pending: false)
+    sentChannelMessages = [];
+    const oldMember = { ...pendingApplicant, pending: true };
+    const acceptedMember = { ...pendingApplicant, pending: false };
+
+    guildService.getSettings = async () => mockSettings;
+    await guildMemberUpdateEvent.execute(oldMember, acceptedMember, {});
+
+    // Assert: Accepted notification logged, MemberInvite.pending updated to false
+    assert.strictEqual(savedMemberInvite.pending, false, 'MemberInvite must update pending to false upon application acceptance');
+    assert.ok(sentChannelMessages.length >= 1);
+    const acceptedEmbed = sentChannelMessages[0].embeds[0];
+    assert.ok(acceptedEmbed.data.title.includes('Application Accepted'));
+    assert.ok(acceptedEmbed.data.description.includes('inviter_99'));
+
+    // Restore stubs
+    MemberInvite.findOneAndUpdate = origFindOneAndUpdate;
+    MemberInvite.findOne = origFindOne;
+    Invite.findOne = origInviteFindOne;
+  });
+
+  guildService.getSettings = originalGetSettings;
+  guildService.updateSettings = originalUpdateSettings;
+
+  console.log(`\n\x1b[36mTest Summary: ${passed} Passed, ${failed} Failed\x1b[0m`);
+  if (failed > 0) {
+    process.exit(1);
+  } else {
+    console.log('\x1b[32m✔ All tests passed successfully!\x1b[0m\n');
+    process.exit(0);
+  }
+})();

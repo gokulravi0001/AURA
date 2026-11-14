@@ -2,6 +2,7 @@ const guildService = require('../../../shared/guildService');
 const counterService = require('../../modules/counterService');
 const statsService = require('../../modules/statsService');
 const inviteService = require('../../modules/inviteService');
+const serverTagService = require('../../modules/serverTagService');
 
 module.exports = {
   name: 'guildMemberRemove',
@@ -22,6 +23,11 @@ module.exports = {
     // 2. Track Member Leave for Invites
     if (settings?.modules?.invite_tracker !== false && settings?.inviteTracker?.enabled !== false) {
       await inviteService.handleMemberLeave(member, settings, client);
+    }
+
+    // 3. Handle Server Tag Auto Role cleanup / metric refresh safely
+    if (settings?.modules?.server_tag_role !== false && settings?.serverTagRole?.enabled) {
+      await serverTagService.handleMemberLeave(member, settings, client);
     }
   }
 };

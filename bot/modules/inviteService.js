@@ -333,15 +333,22 @@ const inviteService = {
 
     // Account age check (Alt / Fake detection: accounts created less than 3 days ago)
     const isFake = (Date.now() - member.user.createdTimestamp) < (3 * 24 * 60 * 60 * 1000);
+    const isPendingScreening = Boolean(member.pending);
 
     let inviterRecord = null;
     let totalInvites = 0;
 
     if (inviterUser) {
-      // 1. Record MemberInvite
+      // 1. Record MemberInvite (stores pending screening status)
       await MemberInvite.findOneAndUpdate(
         { guildId: guild.id, memberId: member.id },
-        { inviterId: inviterUser.id, code: usedInvite.code, isFake },
+        {
+          inviterId: inviterUser.id,
+          code: usedInvite.code,
+          isFake,
+          pending: isPendingScreening,
+          acceptedAt: isPendingScreening ? null : new Date()
+        },
         { upsert: true, new: true }
       );
 
@@ -361,44 +368,137 @@ const inviteService = {
     } else if (isVanity) {
       await MemberInvite.findOneAndUpdate(
         { guildId: guild.id, memberId: member.id },
-        { inviterId: 'vanity', code: guild.vanityURLCode, isFake },
+        {
+          inviterId: 'vanity',
+          code: guild.vanityURLCode,
+          isFake,
+          pending: isPendingScreening,
+          acceptedAt: isPendingScreening ? null : new Date()
+        },
         { upsert: true, new: true }
       );
     } else {
       await MemberInvite.findOneAndUpdate(
         { guildId: guild.id, memberId: member.id },
-        { inviterId: 'unknown', code: 'unknown', isFake },
+        {
+          inviterId: 'unknown',
+          code: 'unknown',
+          isFake,
+          pending: isPendingScreening,
+          acceptedAt: isPendingScreening ? null : new Date()
+        },
         { upsert: true, new: true }
       );
     }
 
-    // 3. Post invite welcome announcement if channel is configured
-    const logChannelId = settings?.inviteTracker?.channelId;
+    // 3. Post invite log (Supports logging who invited who BEFORE accepting server application/screening)
+    const tracker = settings?.inviteTracker;
+    const logChannelId = (isPendingScreening && tracker?.applicationChannelId)
+      ? tracker.applicationChannelId
+      : tracker?.channelId;
+
     if (logChannelId) {
       const channel = guild.channels.cache.get(logChannelId);
       if (channel && channel.isTextBased()) {
         const embed = new EmbedBuilder()
-          .setColor(COLORS.SUCCESS)
-          .setAuthor({ name: `${member.user.tag} joined!`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
+          .setAuthor({
+            name: `${member.user.tag} joined!`,
+            iconURL: member.user.displayAvatarURL({ dynamic: true })
+          })
           .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-          .setFooter({ text: `Member #${guild.memberCount}` })
+          .setFooter({ text: `Member #${guild.memberCount} • ${isPendingScreening ? 'Screening / Application Pending' : 'Direct Join'}` })
           .setTimestamp();
 
-        if (inviterUser && inviterRecord) {
-          embed.setDescription(
-            `👋 Welcome <@${member.id}> to **${guild.name}**!\n\n` +
-            `👤 **Invited by:** <@${inviterUser.id}> (\`${inviterUser.tag}\`)\n` +
-            `📈 **Total Invites:** **${totalInvites}** (Regular: ${inviterRecord.regular}, Bonus: ${inviterRecord.bonus}, Left: ${inviterRecord.left}${isFake ? ', Fake: ' + inviterRecord.fake : ''})\n` +
-            `🔗 **Invite Code:** \`${usedInvite.code}\`${isFake ? '\n⚠️ *Note: Account is under 3 days old (flagged as new/alt).*' : ''}`
-          );
-        } else if (isVanity) {
-          embed.setDescription(`👋 Welcome <@${member.id}> to **${guild.name}**!\n\n🔗 Joined using the server's **Vanity Invite URL**.`);
+        // Dedicated format when joining BEFORE accepting server application / rules
+        if (isPendingScreening) {
+          embed.setColor(COLORS.WARNING || '#f59e0b');
+          embed.setTitle('📋 New Member Joined (Application / Screening Pending)');
+
+          let desc = `**New Member:** <@${member.id}> (\`${member.user.tag}\`)\n`;
+          if (inviterUser) {
+            desc += `👤 **Invited by:** <@${inviterUser.id}> (\`${inviterUser.tag}\`)\n`;
+            desc += `📈 **Inviter's Total:** **${totalInvites}** invites (Regular: ${inviterRecord?.regular || 0}, Bonus: ${inviterRecord?.bonus || 0}, Left: ${inviterRecord?.left || 0})\n`;
+            desc += `🔗 **Invite Link:** \`${usedInvite.code}\`\n`;
+          } else if (isVanity) {
+            desc += `🔗 **Joined via:** Server's **Vanity Invite URL**\n`;
+          } else {
+            desc += `🔗 **Joined via:** Direct invite or integration\n`;
+          }
+
+          desc += `\n⏳ **Status:** 🟡 **Application Pending** — Member has arrived via invite but has **not yet accepted** server rules/application.\n`;
+          desc += `📅 **Account Created:** <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`;
+          if (isFake) {
+            desc += `\n⚠️ *Warning: Account is under 3 days old (flagged as new/alt account).*`;
+          }
+
+          embed.setDescription(desc);
         } else {
-          embed.setDescription(`👋 Welcome <@${member.id}> to **${guild.name}**!\n\n🔗 Joined via direct invite or integration.`);
+          embed.setColor(COLORS.SUCCESS || '#22c55e');
+
+          if (inviterUser && inviterRecord) {
+            embed.setDescription(
+              `👋 Welcome <@${member.id}> to **${guild.name}**!\n\n` +
+              `👤 **Invited by:** <@${inviterUser.id}> (\`${inviterUser.tag}\`)\n` +
+              `📈 **Total Invites:** **${totalInvites}** (Regular: ${inviterRecord.regular}, Bonus: ${inviterRecord.bonus}, Left: ${inviterRecord.left}${isFake ? ', Fake: ' + inviterRecord.fake : ''})\n` +
+              `🔗 **Invite Code:** \`${usedInvite.code}\`${isFake ? '\n⚠️ *Note: Account is under 3 days old (flagged as new/alt).*' : ''}`
+            );
+          } else if (isVanity) {
+            embed.setDescription(`👋 Welcome <@${member.id}> to **${guild.name}**!\n\n🔗 Joined using the server's **Vanity Invite URL**.`);
+          } else {
+            embed.setDescription(`👋 Welcome <@${member.id}> to **${guild.name}**!\n\n🔗 Joined via direct invite or integration.`);
+          }
         }
 
         await channel.send({ embeds: [embed] }).catch(() => {});
       }
+    }
+  },
+
+  /**
+   * Handle when a member completes Membership Screening / Server Application
+   * Triggered from guildMemberUpdate when oldMember.pending === true && newMember.pending === false
+   */
+  async handleMemberApplicationAccepted(member, settings, client) {
+    if (!member || !member.guild) return;
+    const guild = member.guild;
+
+    try {
+      const memberInvite = await MemberInvite.findOneAndUpdate(
+        { guildId: guild.id, memberId: member.id },
+        { pending: false, acceptedAt: new Date() },
+        { new: true }
+      );
+
+      const tracker = settings?.inviteTracker;
+      if (tracker?.enabled === false) return;
+
+      const logChannelId = tracker?.applicationChannelId || tracker?.channelId;
+      if (!logChannelId) return;
+
+      const channel = guild.channels.cache.get(logChannelId);
+      if (!channel || !channel.isTextBased()) return;
+
+      const inviterId = memberInvite?.inviterId;
+      const inviterText = (inviterId && !['vanity', 'unknown'].includes(inviterId))
+        ? `<@${inviterId}>`
+        : inviterId === 'vanity' ? '**Vanity URL**' : 'Unknown / Direct';
+
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.SUCCESS || '#22c55e')
+        .setTitle('✅ Server Application Accepted / Screening Passed')
+        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+        .setDescription(
+          `🎉 <@${member.id}> (\`${member.user.tag}\`) has **accepted the server application / rules**!\n\n` +
+          `👤 **Originally Invited by:** ${inviterText}\n` +
+          (memberInvite?.code ? `🔗 **Invite Code:** \`${memberInvite.code}\`\n` : '') +
+          `⏱️ **Passed Screening:** <t:${Math.floor(Date.now() / 1000)}:R>`
+        )
+        .setFooter({ text: `${guild.name} • Application Verified` })
+        .setTimestamp();
+
+      await channel.send({ embeds: [embed] }).catch(() => {});
+    } catch (err) {
+      logger.error('Error in handleMemberApplicationAccepted:', err.message);
     }
   },
 
@@ -421,17 +521,23 @@ const inviteService = {
         inviterRecord.left += 1;
         await inviterRecord.save();
 
-        const logChannelId = settings?.inviteTracker?.channelId;
+        const tracker = settings?.inviteTracker;
+        const logChannelId = (memberInvite.pending && tracker?.applicationChannelId)
+          ? tracker.applicationChannelId
+          : tracker?.channelId;
+
         if (logChannelId) {
           const channel = guild.channels.cache.get(logChannelId);
           if (channel && channel.isTextBased()) {
+            const wasPending = Boolean(memberInvite.pending);
             const embed = new EmbedBuilder()
               .setColor(COLORS.ERROR)
               .setAuthor({ name: `${member.user.tag} left`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
               .setDescription(
                 `📤 **${member.user.tag}** has left the server.\n\n` +
                 `👤 **Invited by:** <@${memberInvite.inviterId}>\n` +
-                `📈 **Inviter's New Total:** **${inviterRecord.total}** invites (Left: ${inviterRecord.left})`
+                `📈 **Inviter's New Total:** **${inviterRecord.total}** invites (Left: ${inviterRecord.left})` +
+                (wasPending ? `\n\n⚠️ *Note: Member left while their server application / screening was still pending.*` : '')
               )
               .setFooter({ text: `Members remaining: ${guild.memberCount}` })
               .setTimestamp();

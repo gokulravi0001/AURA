@@ -2,9 +2,9 @@ const Guild = require('../models/Guild');
 const logger = require('./logger');
 const whitelistService = require('./whitelistService');
 
-// In-memory cache for fast lookups
+// In-memory cache for fast lookups (5-minute TTL to minimize MongoDB roundtrip latency)
 const guildCache = new Map();
-const CACHE_TTL = 30000; // 30 seconds
+const CACHE_TTL = 300000; // 5 minutes (invalidated instantly on updates)
 
 const guildService = {
   /**

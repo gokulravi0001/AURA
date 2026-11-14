@@ -16,6 +16,7 @@ import BumpSettings from './pages/BumpSettings';
 import Threads from './pages/Threads';
 import CommandsList from './pages/CommandsList';
 import BotSettings from './pages/BotSettings';
+import ServerTagRole from './pages/ServerTagRole';
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/servers/:guildId/games" element={<Games />} />
             <Route path="/servers/:guildId/bump" element={<BumpSettings />} />
             <Route path="/servers/:guildId/threads" element={<Threads />} />
+            <Route path="/servers/:guildId/server-tag-role" element={<ServerTagRole />} />
             <Route path="/servers/:guildId/commands" element={<CommandsList />} />
             <Route path="/servers/:guildId/settings" element={<BotSettings />} />
           </Route>

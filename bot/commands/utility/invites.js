@@ -32,6 +32,23 @@ module.exports = {
             .addChannelTypes(ChannelType.GuildText)
             .setRequired(true)
         )
+        .addChannelOption(opt =>
+          opt.setName('app_channel')
+            .setDescription('Optional dedicated channel to log who invited applicants before screening')
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(false)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName('prelog')
+        .setDescription('Log who invited members before they accept the server application or rules (Admin only)')
+        .addBooleanOption(opt => opt.setName('enabled').setDescription('Enable or disable pre-application invite logging').setRequired(false))
+        .addChannelOption(opt =>
+          opt.setName('channel')
+            .setDescription('Dedicated channel to log who invited applicants before screening')
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(false)
+        )
     )
     .addSubcommand(sub =>
       sub.setName('add')
@@ -140,25 +157,71 @@ module.exports = {
     // 3. SETUP
     if (sub === 'setup') {
       const channel = interaction.options.getChannel('channel');
+      const appChannel = interaction.options.getChannel('app_channel');
 
-      await Guild.updateOne(
-        { guildId },
-        {
-          $set: {
-            'modules.invite_tracker': true,
-            'inviteTracker.enabled': true,
-            'inviteTracker.channelId': channel.id
-          }
-        },
-        { upsert: true }
-      );
+      const updateData = {
+        'modules.invite_tracker': true,
+        'inviteTracker.enabled': true,
+        'inviteTracker.channelId': channel.id
+      };
+      if (appChannel) {
+        updateData['inviteTracker.applicationChannelId'] = appChannel.id;
+      }
+
+      await Guild.updateOne({ guildId }, { $set: updateData }, { upsert: true });
+
+      const desc = appChannel
+        ? `• **General Invite Logs:** <#${channel.id}>\n• **Pre-Application Invite Logs:** <#${appChannel.id}>\n\nMembers joining via invite will be logged with their inviter immediately, even before they accept the server application or rules!`
+        : `Invite join/leave logs will be announced in <#${channel.id}>.\nWho invited incoming members will also be logged here before they accept the server application!`;
 
       return interaction.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(COLORS.SUCCESS)
             .setTitle('📈 Invite Tracker Configured')
-            .setDescription(`Invite join and leave logs will now be announced in <#${channel.id}>!`)
+            .setDescription(desc)
+        ]
+      });
+    }
+
+    // 3.5. PRELOG (Log who invited who before accepting server application)
+    if (sub === 'prelog') {
+      const enabledOpt = interaction.options.getBoolean('enabled');
+      const channel = interaction.options.getChannel('channel');
+
+      const updateData = {};
+      if (enabledOpt !== null) updateData['inviteTracker.logPreScreening'] = enabledOpt;
+      if (channel) updateData['inviteTracker.applicationChannelId'] = channel.id;
+
+      if (Object.keys(updateData).length === 0) {
+        const tracker = settings?.inviteTracker;
+        const appChan = tracker?.applicationChannelId ? `<#${tracker.applicationChannelId}>` : (tracker?.channelId ? `<#${tracker.channelId}>` : '*None set*');
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(COLORS.PRIMARY)
+              .setTitle('📋 Pre-Application Invite Log Status')
+              .setDescription(
+                `• **Status:** ${tracker?.logPreScreening !== false ? '🟢 **Enabled**' : '🔴 **Disabled**'}\n` +
+                `• **Log Channel:** ${appChan}\n\n` +
+                `*When enabled, incoming members arriving via an invite link are logged immediately with their inviter before they complete screening or accept the server application.*`
+              )
+          ]
+        });
+      }
+
+      await Guild.updateOne({ guildId }, { $set: updateData }, { upsert: true });
+
+      return interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.SUCCESS)
+            .setTitle('📋 Pre-Application Invite Logging Updated')
+            .setDescription(
+              `Pre-application invite logging updated!\n` +
+              (channel ? `• Dedicated channel set to: <#${channel.id}>\n` : '') +
+              (enabledOpt !== null ? `• Status: ${enabledOpt ? '🟢 Enabled' : '🔴 Disabled'}` : '')
+            )
         ]
       });
     }
@@ -264,29 +327,63 @@ module.exports = {
       return message.reply(`🛡️ Inviter Role Guard activated! Only members with <@&${role.id}> can now create or share invites.`);
     }
 
-    // +inv setup #channel
+    // +inv setup #channel [#app-log-channel]
     if (action === 'setup') {
       if (!isOwnerOrAdmin(message.member, message.guild, client, settings)) {
         return message.reply('🚫 Administrator, Server Owner, or Whitelisted permissions required.');
       }
-      const channel = message.mentions.channels.first();
+      const channels = message.mentions.channels;
+      const channel = channels.first();
       if (!channel) {
-        return message.reply('❌ Usage: `+inv setup #channel`');
+        return message.reply('❌ Usage: `+inv setup #channel [#application-log-channel]`');
       }
 
-      await Guild.updateOne(
-        { guildId },
-        {
-          $set: {
-            'modules.invite_tracker': true,
-            'inviteTracker.enabled': true,
-            'inviteTracker.channelId': channel.id
-          }
-        },
-        { upsert: true }
-      );
+      const appChannel = channels.size > 1 ? Array.from(channels.values())[1] : null;
 
-      return message.reply(`📈 Invite Tracker configured! Join/leave logs will be announced in <#${channel.id}>.`);
+      const updateData = {
+        'modules.invite_tracker': true,
+        'inviteTracker.enabled': true,
+        'inviteTracker.channelId': channel.id
+      };
+      if (appChannel) {
+        updateData['inviteTracker.applicationChannelId'] = appChannel.id;
+      }
+
+      await Guild.updateOne({ guildId }, { $set: updateData }, { upsert: true });
+
+      const replyText = appChannel
+        ? `📈 Invite Tracker configured!\n• **General Invite Logs:** <#${channel.id}>\n• **Pre-Application Invite Logs:** <#${appChannel.id}> (logs who invited applicants before screening)`
+        : `📈 Invite Tracker configured! Join/leave logs (including pre-application logs) will be announced in <#${channel.id}>.`;
+
+      return message.reply(replyText);
+    }
+
+    // +inv prelog [on|off] [#channel]
+    if (action === 'prelog') {
+      if (!isOwnerOrAdmin(message.member, message.guild, client, settings)) {
+        return message.reply('🚫 Administrator, Server Owner, or Whitelisted permissions required.');
+      }
+      const channel = message.mentions.channels.first();
+      const subOpt = args[1]?.toLowerCase();
+
+      const updateData = {};
+      if (subOpt === 'on' || subOpt === 'enable') updateData['inviteTracker.logPreScreening'] = true;
+      if (subOpt === 'off' || subOpt === 'disable') updateData['inviteTracker.logPreScreening'] = false;
+      if (channel) updateData['inviteTracker.applicationChannelId'] = channel.id;
+
+      if (Object.keys(updateData).length === 0) {
+        const tracker = settings?.inviteTracker;
+        const appChan = tracker?.applicationChannelId ? `<#${tracker.applicationChannelId}>` : (tracker?.channelId ? `<#${tracker.channelId}>` : '*None set*');
+        return message.reply(
+          `📋 **Pre-Application Invite Log Status:**\n` +
+          `• **Status:** ${tracker?.logPreScreening !== false ? '🟢 **Enabled**' : '🔴 **Disabled**'}\n` +
+          `• **Channel:** ${appChan}\n` +
+          `Usage: \`+inv prelog on #channel\` or \`+inv prelog off\``
+        );
+      }
+
+      await Guild.updateOne({ guildId }, { $set: updateData }, { upsert: true });
+      return message.reply(`📋 Pre-Application Invite Logging updated! (Channel: ${channel ? `<#${channel.id}>` : 'Default invite channel'})`);
     }
 
     // +inv add @user <amount>

@@ -44,11 +44,6 @@ module.exports = {
     const autoDeleted = await autoDeleteService.handleMessage(message, settings, client);
     if (autoDeleted) return;
 
-    // Tag Auto-Role: Passive check on active chatters
-    if (settings?.tagRole?.enabled && message.member) {
-      tagRoleService.checkAndApply(message.member, settings, client, 'chat').catch(() => {});
-    }
-
     // 1. PREFIX COMMAND HANDLING (+)
     if (message.content.startsWith(prefix)) {
       const args = message.content.slice(prefix.length).trim().split(/ +/);

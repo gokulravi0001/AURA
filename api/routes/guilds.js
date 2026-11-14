@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { PermissionFlagsBits } = require('discord.js');
 const client = require('../../bot/client');
 const guildService = require('../../shared/guildService');
 const { requireAuth, requireGuildAdmin } = require('../middleware/auth');
@@ -10,6 +11,7 @@ const Birthday = require('../../models/Birthday');
 const ServerStats = require('../../models/ServerStats');
 const AuditLog = require('../../models/AuditLog');
 const statsService = require('../../bot/modules/statsService');
+const serverTagService = require('../../bot/modules/serverTagService');
 
 // All guild routes require authentication & admin permissions for the guild
 router.use('/:guildId', requireAuth, requireGuildAdmin);
@@ -116,21 +118,36 @@ router.get('/:guildId/channels', (req, res) => {
 });
 
 // 5. GET /api/guilds/:guildId/roles - List guild roles for dropdowns
-router.get('/:guildId/roles', (req, res) => {
+router.get('/:guildId/roles', async (req, res) => {
   const guild = client.guilds.cache.get(req.params.guildId);
   if (!guild) {
     return res.status(404).json({ error: 'Bot is not in this guild.' });
   }
 
+  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+  const hasManageRoles = Boolean(botMember?.permissions?.has(PermissionFlagsBits.ManageRoles));
+  const botHighestPosition = botMember?.roles?.highest?.position ?? -1;
+
   const roles = guild.roles.cache
     .filter(r => r.id !== guild.id) // exclude @everyone
+    .sort((a, b) => b.position - a.position)
     .map(r => ({
       id: r.id,
       name: r.name,
-      color: r.hexColor
+      color: r.hexColor,
+      position: r.position,
+      managed: Boolean(r.managed),
+      assignable: Boolean(!r.managed && hasManageRoles && botHighestPosition > r.position)
     }));
 
-  res.json({ roles });
+  res.json({
+    roles,
+    botCapabilities: {
+      manageRoles: hasManageRoles,
+      highestRolePosition: botHighestPosition,
+      highestRoleName: botMember?.roles?.highest?.name || null
+    }
+  });
 });
 
 // 6. GET /api/guilds/:guildId/leaderboard - Paginated leaderboard
@@ -189,6 +206,209 @@ router.post('/:guildId/sticky', async (req, res) => {
     res.json({ success: true, sticky: updated });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save sticky message.' });
+  }
+});
+
+async function buildServerTagRolePayload(guild, settings) {
+  const config = settings?.serverTagRole || {};
+  const moduleEnabled = settings?.modules?.server_tag_role !== false;
+  const tagInfo = serverTagService.detectGuildServerTagInfo(guild, config);
+
+  let botCapabilities = {
+    manageRoles: false,
+    highestRolePosition: -1,
+    highestRoleName: null
+  };
+  let roleValidation = null;
+  let activeMemberCount = config.activeMemberCount || 0;
+
+  if (guild) {
+    const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    const hasManageRoles = Boolean(botMember?.permissions?.has(PermissionFlagsBits.ManageRoles));
+    botCapabilities = {
+      manageRoles: hasManageRoles,
+      highestRolePosition: botMember?.roles?.highest?.position ?? -1,
+      highestRoleName: botMember?.roles?.highest?.name || null
+    };
+
+    if (config.roleId) {
+      const check = await serverTagService.validateRoleConfiguration(guild, config.roleId);
+      roleValidation = {
+        valid: check.valid,
+        code: check.code || null,
+        error: check.error || null,
+        roleName: check.role?.name || null
+      };
+
+      const role = guild.roles.cache.get(config.roleId);
+      if (role) {
+        activeMemberCount = guild.members.cache.filter(
+          m => m.roles.cache.has(config.roleId) && (config.includeBots || !m.user.bot)
+        ).size;
+      }
+    } else if (!hasManageRoles) {
+      roleValidation = {
+        valid: false,
+        code: 'MISSING_MANAGE_ROLES',
+        error: 'The bot is missing the Manage Roles permission in this server.',
+        roleName: null
+      };
+    }
+  }
+
+  return {
+    moduleEnabled,
+    config: {
+      enabled: Boolean(config.enabled),
+      roleId: config.roleId || '',
+      includeBots: Boolean(config.includeBots),
+      serverTagId: config.serverTagId || guild?.id || null,
+      detectedTag: tagInfo.tag || config.detectedTag || null,
+      detectedBadge: tagInfo.badge || config.detectedBadge || null,
+      activeMemberCount,
+      lastSyncAt: config.lastSyncAt || null,
+      lastSyncStatus: config.lastSyncStatus || 'idle',
+      lastSyncMessage: config.lastSyncMessage || null
+    },
+    tagInfo,
+    botCapabilities,
+    roleValidation
+  };
+}
+
+// 10. GET /api/guilds/:guildId/server-tag-role
+router.get('/:guildId/server-tag-role', async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    const guild = client.guilds.cache.get(guildId);
+    const settings = await guildService.getSettings(guildId);
+    const payload = await buildServerTagRolePayload(guild, settings);
+    res.json({ ...payload, canManage: req.canManage });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load Server Tag Auto Role configuration.' });
+  }
+});
+
+// 11. PUT /api/guilds/:guildId/server-tag-role
+router.put('/:guildId/server-tag-role', async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+      return res.status(404).json({ error: 'Bot is not in this guild.' });
+    }
+
+    const currentSettings = await guildService.getSettings(guildId);
+    const currentConfig = currentSettings?.serverTagRole || {};
+    const enabled = Boolean(req.body?.enabled);
+    const roleId = typeof req.body?.roleId === 'string' && req.body.roleId.trim()
+      ? req.body.roleId.trim()
+      : null;
+    const includeBots = Boolean(req.body?.includeBots);
+
+    if (enabled && !roleId) {
+      return res.status(400).json({
+        error: 'Please select a target role before enabling Server Tag Auto Role.',
+        code: 'NO_ROLE_SELECTED'
+      });
+    }
+
+    if (roleId && (enabled || roleId !== currentConfig.roleId)) {
+      const validation = await serverTagService.validateRoleConfiguration(guild, roleId);
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: validation.error,
+          code: validation.code
+        });
+      }
+    }
+
+    const tagInfo = serverTagService.detectGuildServerTagInfo(guild, currentConfig);
+    const updateData = {
+      'serverTagRole.enabled': enabled,
+      'serverTagRole.roleId': roleId,
+      'serverTagRole.includeBots': includeBots,
+      'serverTagRole.serverTagId': tagInfo.serverTagId || guild.id,
+      'serverTagRole.detectedTag': tagInfo.tag || currentConfig.detectedTag || null,
+      'serverTagRole.detectedBadge': tagInfo.badge || currentConfig.detectedBadge || null,
+      'serverTagRole.updatedBy': req.user.id,
+      'serverTagRole.updatedAt': new Date()
+    };
+
+    if (enabled) {
+      updateData['modules.server_tag_role'] = true;
+    }
+
+    let updatedSettings = await guildService.updateSettings(guildId, updateData);
+
+    await AuditLog.create({
+      guildId,
+      action: 'SERVER_TAG_ROLE_UPDATE',
+      executorId: req.user.id,
+      executorTag: req.user.username,
+      details: `Server Tag Auto Role updated (Enabled: ${enabled}, Role: ${roleId || 'None'}, Include Bots: ${includeBots})`
+    });
+
+    if (enabled && roleId) {
+      await serverTagService.syncGuild(guild, updatedSettings, client, {
+        source: 'dashboardSave',
+        force: true
+      });
+      updatedSettings = await guildService.getSettings(guildId);
+    } else if (client.io) {
+      client.io.to(`guild_${guildId}`).emit('settingsUpdate', updatedSettings);
+    }
+
+    const payload = await buildServerTagRolePayload(guild, updatedSettings);
+    res.json({ success: true, ...payload });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save Server Tag Auto Role configuration.' });
+  }
+});
+
+// 12. POST /api/guilds/:guildId/server-tag-role/sync
+router.post('/:guildId/server-tag-role/sync', async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+      return res.status(404).json({ error: 'Bot is not in this guild.' });
+    }
+
+    const settings = await guildService.getSettings(guildId);
+    const syncResult = await serverTagService.syncGuild(guild, settings, client, {
+      source: 'manual',
+      force: true
+    });
+
+    const freshSettings = await guildService.getSettings(guildId);
+    const payload = await buildServerTagRolePayload(guild, freshSettings);
+
+    await AuditLog.create({
+      guildId,
+      action: 'SERVER_TAG_ROLE_SYNC',
+      executorId: req.user.id,
+      executorTag: req.user.username,
+      details: syncResult.message || `Manual Server Tag sync (${syncResult.status || (syncResult.success ? 'success' : 'error')})`
+    });
+
+    if (!syncResult.success) {
+      return res.status(400).json({
+        success: false,
+        error: syncResult.error || syncResult.message || 'Synchronization failed.',
+        code: syncResult.code || 'SYNC_FAILED',
+        syncResult,
+        ...payload
+      });
+    }
+
+    res.json({
+      success: true,
+      syncResult,
+      ...payload
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to synchronize Server Tag Auto Role.' });
   }
 });
 

@@ -24,7 +24,8 @@ const MODULE_DEFINITIONS = [
   { key: 'bump_reminder', name: 'Bump Reminder', emoji: '⏰', desc: 'Tracks Disboard bump timers & sends reminders' },
   { key: 'invite_tracker', name: 'Invite Tracker', emoji: '📈', desc: 'Tracks who invited members, leaves & alts' },
   { key: 'emoji_manager', name: 'Emoji Stealer & Packs', emoji: '✨', desc: 'Mass add, selective add & curated emoji packs' },
-  { key: 'invite_guard', name: 'Inviter Role Guard', emoji: '🔒', desc: 'Restricts invite creation and sharing exclusively to Inviter role' }
+  { key: 'invite_guard', name: 'Inviter Role Guard', emoji: '🔒', desc: 'Restricts invite creation and sharing exclusively to Inviter role' },
+  { key: 'server_tag_role', name: 'Server Tag Auto Role', emoji: '🏷️', desc: 'Automatically assigns a role to members wearing this server\'s tag' }
 ];
 
 const MODULE_ALIASES = {
@@ -39,7 +40,8 @@ const MODULE_ALIASES = {
   bump: 'bump_reminder', bump_reminder: 'bump_reminder', bumpreminder: 'bump_reminder',
   invites: 'invite_tracker', invite: 'invite_tracker', invite_tracker: 'invite_tracker', invitetracker: 'invite_tracker',
   emoji: 'emoji_manager', emojis: 'emoji_manager', steal: 'emoji_manager', emoji_manager: 'emoji_manager',
-  inviteguard: 'invite_guard', inviterole: 'invite_guard', invguard: 'invite_guard', invite_guard: 'invite_guard'
+  inviteguard: 'invite_guard', inviterole: 'invite_guard', invguard: 'invite_guard', invite_guard: 'invite_guard',
+  tag: 'server_tag_role', servertag: 'server_tag_role', tagrole: 'server_tag_role', server_tag_role: 'server_tag_role'
 };
 
 function buildModulesPanel(settings, guild) {
@@ -124,7 +126,8 @@ module.exports = {
               { name: '💬 Auto Image Threads', value: 'image_threads' },
               { name: '🎮 Minigames', value: 'minigames' },
               { name: '⏰ Bump Reminder', value: 'bump_reminder' },
-              { name: '📈 Invite Tracker', value: 'invite_tracker' }
+              { name: '📈 Invite Tracker', value: 'invite_tracker' },
+              { name: '🏷️ Server Tag Auto Role', value: 'server_tag_role' }
             )
         )
     )
@@ -146,7 +149,8 @@ module.exports = {
               { name: '💬 Auto Image Threads', value: 'image_threads' },
               { name: '🎮 Minigames', value: 'minigames' },
               { name: '⏰ Bump Reminder', value: 'bump_reminder' },
-              { name: '📈 Invite Tracker', value: 'invite_tracker' }
+              { name: '📈 Invite Tracker', value: 'invite_tracker' },
+              { name: '🏷️ Server Tag Auto Role', value: 'server_tag_role' }
             )
         )
     )
@@ -167,7 +171,8 @@ module.exports = {
               { name: '💬 Auto Image Threads', value: 'image_threads' },
               { name: '🎮 Minigames', value: 'minigames' },
               { name: '⏰ Bump Reminder', value: 'bump_reminder' },
-              { name: '📈 Invite Tracker', value: 'invite_tracker' }
+              { name: '📈 Invite Tracker', value: 'invite_tracker' },
+              { name: '🏷️ Server Tag Auto Role', value: 'server_tag_role' }
             )
         )
     )

@@ -31,7 +31,8 @@ module.exports = {
     BUMP_REMINDER: 'bump_reminder',
     INVITE_TRACKER: 'invite_tracker',
     EMOJI_MANAGER: 'emoji_manager',
-    INVITE_GUARD: 'invite_guard'
+    INVITE_GUARD: 'invite_guard',
+    SERVER_TAG_ROLE: 'server_tag_role'
   },
 
   // Default Guild Configuration
@@ -50,7 +51,8 @@ module.exports = {
       bump_reminder: true,
       invite_tracker: true,
       emoji_manager: true,
-      invite_guard: true
+      invite_guard: true,
+      server_tag_role: true
     },
     language: 'en',
     timezone: 'UTC'
