@@ -46,6 +46,8 @@ export default function CommandsList() {
     { name: 'ticket add', slash: '/ticket add <user>', prefix: '+ticket add @user', category: 'Tickets', desc: 'Add a user to this ticket channel', perm: 'Ticket Staff' },
 
     // Moderation & Counters
+    { name: 'addemj', slash: '/addemj [message_id] [emojis]', prefix: '+addemj', category: 'Moderation', desc: 'Reply to an emoji to add it and all emojis from all messages below it directly to your server', perm: 'Manage Expressions' },
+    { name: 'emoji steal', slash: '/emoji steal <emojis>', prefix: '+steal <emojis>', category: 'Moderation', desc: 'Detect and mass add or selectively add emojis from custom emojis or text', perm: 'Manage Expressions' },
     { name: 'invites prelog', slash: '/invites prelog [enabled] [channel]', prefix: '+inv prelog [on|off] [#channel]', category: 'Moderation', desc: 'Log who invited new members immediately before they accept the server application or rules', perm: 'Administrator' },
     { name: 'servertag set', slash: '/servertag set <role> [include_bots]', prefix: '+servertag set @role', category: 'Moderation', desc: 'Set the role automatically granted/revoked for members wearing this server\'s Discord Server Tag', perm: 'Administrator' },
     { name: 'servertag on / off', slash: '/servertag on | /servertag off', prefix: '+servertag on / +servertag off', category: 'Moderation', desc: 'Turn Server Tag Auto Role ON or OFF while keeping your role saved', perm: 'Administrator' },

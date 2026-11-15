@@ -340,8 +340,9 @@ const emojiManager = {
    * @param {import('discord.js').Guild} guild
    * @param {Array<{ name: string, url: string, animated: boolean }>} items
    * @param {import('discord.js').User} user
+   * @param {Function} [onProgress]
    */
-  async uploadEmojis(guild, items, user) {
+  async uploadEmojis(guild, items, user, onProgress = null) {
     const results = {
       success: [],
       failed: []
@@ -351,7 +352,9 @@ const emojiManager = {
     let remainingStatic = slots.freeStatic;
     let remainingAnimated = slots.freeAnimated;
 
+    let processed = 0;
     for (const item of items) {
+      processed++;
       // Check slot limits
       if (!item.animated && remainingStatic <= 0) {
         results.failed.push({ item, error: 'No free static emoji slots left' });
@@ -370,7 +373,7 @@ const emojiManager = {
         const created = await guild.emojis.create({
           attachment: item.url,
           name: cleanName || 'custom_emoji',
-          reason: `Added by ${user.tag || user.username} via AURA Emoji Manager`
+          reason: `Added by ${user.tag || user.username} via AURA (+addemj)`
         });
 
         results.success.push(created);
@@ -380,8 +383,14 @@ const emojiManager = {
           remainingStatic--;
         }
 
-        // Slight rate limit safety buffer
-        await new Promise(r => setTimeout(r, 650));
+        if (typeof onProgress === 'function') {
+          try {
+            await onProgress(processed, items.length, results.success.length);
+          } catch (_) {}
+        }
+
+        // Rate limit safety buffer (600ms)
+        await new Promise(r => setTimeout(r, 600));
       } catch (err) {
         logger.warn(`Failed to create emoji ${cleanName}:`, err.message);
         results.failed.push({ item, error: err.message });
@@ -402,7 +411,10 @@ const emojiManager = {
     const embed = new EmbedBuilder()
       .setColor(hasSuccess ? COLORS.SUCCESS : COLORS.ERROR)
       .setTitle(hasSuccess ? '🎉 Emoji Upload Completed!' : '❌ Emoji Upload Failed')
-      .setFooter({ text: `Requested by ${user.username}`, iconURL: user.displayAvatarURL({ dynamic: true }) })
+      .setFooter({
+        text: `Requested by ${user?.username || 'User'}`,
+        iconURL: typeof user?.displayAvatarURL === 'function' ? user.displayAvatarURL({ dynamic: true }) : undefined
+      })
       .setTimestamp();
 
     let desc = '';

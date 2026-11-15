@@ -64,7 +64,9 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN)
     logger.success(`  Registered: ${data.map(c => '/' + c.name).join(', ')}`);
     logger.success(`  MongoDB user data (birthdays, etc.) was NOT touched.`);
     logger.success(`=================================================`);
+    process.exit(0);
   } catch (error) {
     logger.error('Error deploying commands:', error);
+    process.exit(1);
   }
 })();

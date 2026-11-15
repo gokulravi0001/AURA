@@ -1171,6 +1171,156 @@ function createServerTagTestContext(options = {}) {
     Invite.findOne = origInviteFindOne;
   });
 
+  // 24. Bulk Emoji Stealer & Add Below (+addemj)
+  await asyncTest('Features: Bulk Emoji Stealer & Add Below (+addemj)', async () => {
+    const addemjCmd = require('../bot/commands/utility/addemj');
+    const emojiManager = require('../bot/modules/emojiManager');
+    const { PermissionsBitField } = require('discord.js');
+
+    // 1. Verify command metadata & aliases
+    assert.strictEqual(addemjCmd.name, 'addemj');
+    assert.ok(addemjCmd.aliases.includes('addemoji'));
+    assert.ok(addemjCmd.aliases.includes('emj'));
+    assert.ok(addemjCmd.aliases.includes('stealall'));
+    assert.ok(addemjCmd.aliases.includes('addemojis'));
+    const json = addemjCmd.data.toJSON();
+    assert.strictEqual(json.name, 'addemj');
+    assert.ok(json.options.find(o => o.name === 'message_id'));
+    assert.ok(json.options.find(o => o.name === 'emojis'));
+
+    // 2. Setup mock guild & channel with message history
+    const createdEmojis = [];
+    const mockGuild = {
+      id: 'guild_emoji_test',
+      name: 'Emoji Test Guild',
+      premiumTier: 0,
+      emojis: {
+        cache: new Map(),
+        create: async (data) => {
+          createdEmojis.push(data);
+          const emojiObj = {
+            id: `emj_${createdEmojis.length}`,
+            name: data.name,
+            animated: data.name.includes('cat'),
+            toString() { return `<${this.animated ? 'a' : ''}:${this.name}:${this.id}>`; }
+          };
+          mockGuild.emojis.cache.set(emojiObj.id, emojiObj);
+          return emojiObj;
+        }
+      },
+      members: {
+        fetchMe: async () => ({
+          permissions: {
+            has: (perm) => true
+          }
+        })
+      }
+    };
+
+    const targetMsg = {
+      id: 'msg_target_1',
+      createdTimestamp: 1000,
+      content: 'Here is an emoji <:pepe_happy:102030405060708090>',
+      attachments: new Map()
+    };
+    const belowMsg1 = {
+      id: 'msg_below_1',
+      createdTimestamp: 2000,
+      content: 'And another one <a:party_cat:908070605040302010>',
+      attachments: new Map()
+    };
+    const belowMsg2 = {
+      id: 'msg_below_2',
+      createdTimestamp: 3000,
+      content: 'Check this image!',
+      attachments: new Map([
+        ['att_1', { url: 'https://example.com/custom_badge.png' }]
+      ])
+    };
+    const cmdMsg = {
+      id: 'msg_cmd_1',
+      createdTimestamp: 4000,
+      content: '+addemj',
+      reference: { messageId: 'msg_target_1' },
+      attachments: new Map(),
+      guild: mockGuild,
+      author: { id: '1487429529717706842', tag: 'Dev#0001', username: 'Dev', displayAvatarURL: () => 'https://example.com/dev.png' },
+      member: {
+        id: '1487429529717706842',
+        user: { id: '1487429529717706842' },
+        permissions: {
+          has: (perm) => false // User lacks Manage Expressions directly, but is Developer -> bypass!
+        }
+      }
+    };
+
+    const mockChannel = {
+      id: 'chan_emj_1',
+      messages: {
+        fetch: async (opts) => {
+          if (typeof opts === 'string') {
+            if (opts === 'msg_target_1') return targetMsg;
+            return null;
+          }
+          if (opts && opts.after === 'msg_target_1') {
+            return new Map([
+              [belowMsg1.id, belowMsg1],
+              [belowMsg2.id, belowMsg2],
+              [cmdMsg.id, cmdMsg]
+            ]);
+          }
+          return new Map();
+        }
+      }
+    };
+    cmdMsg.channel = mockChannel;
+
+    let replySent = null;
+    let editedResult = null;
+    let progressCalls = 0;
+
+    cmdMsg.reply = async (payload) => {
+      replySent = payload;
+      return {
+        edit: async (editPayload) => {
+          if (typeof editPayload === 'string' || (editPayload.content && !editPayload.embeds)) {
+            progressCalls++;
+          }
+          editedResult = editPayload;
+          return editedResult;
+        }
+      };
+    };
+
+    // Execute +addemj prefix command
+    await addemjCmd.executePrefix(cmdMsg, [], { owners: ['1487429529717706842'] }, {});
+
+    // Assert: statusMsg was sent, emojis were uploaded, progress/result embed was generated
+    assert.ok(replySent, 'Initial status message must be replied');
+    assert.strictEqual(createdEmojis.length, 3, 'All 3 emojis/images from target + below messages must be added');
+    assert.strictEqual(createdEmojis[0].name, 'pepe_happy');
+    assert.strictEqual(createdEmojis[1].name, 'party_cat');
+    assert.strictEqual(createdEmojis[2].name, 'custom_badge');
+    assert.ok(editedResult, 'Final edited message must exist');
+    assert.ok(editedResult.embeds && editedResult.embeds.length === 1, 'Final result must include summary embed');
+
+    // Test permission check failure for non-developer / non-admin
+    const nonPermMemberMsg = {
+      ...cmdMsg,
+      author: { id: 'regular_user_11', tag: 'User#1234', username: 'User' },
+      member: {
+        permissions: {
+          has: () => false
+        }
+      },
+      reply: async (msg) => {
+        return { content: msg };
+      }
+    };
+    const deniedReply = await addemjCmd.executePrefix(nonPermMemberMsg, [], { owners: ['1487429529717706842'] }, {});
+    assert.ok(deniedReply.content.includes('Manage Expressions / Emojis'), 'Must reject user lacking permissions');
+  });
+
   guildService.getSettings = originalGetSettings;
   guildService.updateSettings = originalUpdateSettings;
 

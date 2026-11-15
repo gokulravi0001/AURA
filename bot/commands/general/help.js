@@ -60,7 +60,7 @@ function buildHelpEmbed(prefix, client) {
       },
       {
         name: '✨ Emoji Stealer & Curated Packs (Mass & Selective Add)',
-        value: `\`${prefix}steal <emojis...>\` • \`${prefix}massadd <emojis...>\` • \`${prefix}emoji packs\` • \`${prefix}emoji add <url> [name]\` • \`${prefix}emoji list\`\n*Mass add all detected emojis or selectively pick via interactive dropdown! Reply to any message with \`${prefix}steal\` to extract its emojis.*`
+        value: `\`${prefix}addemj\` *(reply to add target emoji & all emojis below it)* • \`${prefix}steal <emojis...>\` • \`${prefix}massadd <emojis...>\` • \`${prefix}emoji packs\` • \`${prefix}emoji list\`\n*Reply to any emoji with \`${prefix}addemj\` to instantly add it and all emojis in messages below it directly to your server! Or use \`${prefix}steal\` for selective dropdown.*`
       },
       {
         name: '🧹 Chat Moderation & Purge (Reply to Purge)',
