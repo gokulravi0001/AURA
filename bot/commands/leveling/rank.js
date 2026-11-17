@@ -10,7 +10,7 @@ module.exports = {
     .addUserOption(opt => opt.setName('user').setDescription('The user whose rank you want to view')),
   name: 'rank',
   description: 'Check your or another member\'s XP, level, and server rank',
-  aliases: ['level', 'xp'],
+  aliases: ['rankcard', 'myrank'],
   module: 'leveling',
 
   async execute(interaction, client, settings) {

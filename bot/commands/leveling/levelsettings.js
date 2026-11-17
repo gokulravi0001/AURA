@@ -1,19 +1,24 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder } = require('discord.js');
 const Guild = require('../../../models/Guild');
+const levelingHub = require('../../modules/levelingHub');
 const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('levels')
-    .setDescription('Configure leveling options and announcement channels (Admin only)')
+    .setDescription('Interactive Leveling & XP Hub (Rank, Leaderboard, Rewards, Settings)')
+    .addSubcommand(sub =>
+      sub.setName('hub')
+        .setDescription('Open the Interactive Leveling Hub')
+    )
     .addSubcommand(sub =>
       sub.setName('view')
         .setDescription('View current server leveling parameters')
     )
     .addSubcommand(sub =>
       sub.setName('channel')
-        .setDescription('Set the level-up announcement channel')
+        .setDescription('Set the level-up announcement channel (Admin only)')
         .addChannelOption(opt =>
           opt.setName('channel')
             .setDescription('Announcement channel (leave empty to announce where user is chatting)')
@@ -22,20 +27,21 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub.setName('rates')
-        .setDescription('Configure min/max XP per message and cooldown')
+        .setDescription('Configure min/max XP per message and cooldown (Admin only)')
         .addIntegerOption(opt => opt.setName('min').setDescription('Minimum XP per message').setRequired(true))
         .addIntegerOption(opt => opt.setName('max').setDescription('Maximum XP per message').setRequired(true))
         .addIntegerOption(opt => opt.setName('cooldown').setDescription('Cooldown between messages in seconds').setRequired(true))
     ),
   name: 'levels',
-  description: 'Configure leveling parameters',
-  aliases: ['levelsettings', 'level-settings'],
-  permissions: [PermissionFlagsBits.Administrator],
+  description: 'Interactive Leveling & XP Hub (Rank, Leaderboard, Rewards, Settings)',
+  aliases: ['level', 'leveling', 'xp', 'levelsettings', 'level-settings'],
   module: 'leveling',
 
   async execute(interaction, client, settings) {
-    const sub = interaction.options.getSubcommand();
-    const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+    let guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+    if (!guildDoc) guildDoc = await Guild.create({ guildId: interaction.guild.id });
+
+    const sub = interaction.options.getSubcommand(false);
 
     if (sub === 'view') {
       const embed = buildSettingsEmbed(interaction.guild, guildDoc);
@@ -43,6 +49,10 @@ module.exports = {
     }
 
     if (sub === 'channel') {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
+        return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
+      }
+
       const channel = interaction.options.getChannel('channel');
       guildDoc.leveling.announcementChannelId = channel ? channel.id : null;
       await guildDoc.save();
@@ -55,6 +65,10 @@ module.exports = {
     }
 
     if (sub === 'rates') {
+      if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
+        return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
+      }
+
       const min = interaction.options.getInteger('min');
       const max = interaction.options.getInteger('max');
       const cooldown = interaction.options.getInteger('cooldown');
@@ -80,25 +94,39 @@ module.exports = {
         ]
       });
     }
+
+    // Default: Interactive Leveling Hub
+    const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
+    const embed = await levelingHub.buildHubEmbed(interaction.guild, guildDoc, interaction.user, isAdmin);
+    const components = levelingHub.buildHubComponents(isAdmin);
+    return interaction.reply({ embeds: [embed], components });
   },
 
   async executePrefix(message, args, client, settings) {
     const action = args[0]?.toLowerCase();
-    const guildDoc = await Guild.findOne({ guildId: message.guild.id });
-
-    if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
-      return message.reply('🚫 Administrator permission required.');
-    }
+    let guildDoc = await Guild.findOne({ guildId: message.guild.id });
+    if (!guildDoc) guildDoc = await Guild.create({ guildId: message.guild.id });
 
     if (action === 'channel') {
+      if (!isOwnerOrAdmin(message.member || message.author, message.guild, client)) {
+        return message.reply('🚫 Administrator permission required.');
+      }
       const channel = message.mentions.channels.first();
       guildDoc.leveling.announcementChannelId = channel ? channel.id : null;
       await guildDoc.save();
       return message.reply(channel ? `📢 Level-up channel set to <#${channel.id}>.` : '📢 Level-up messages will post where user chats.');
     }
 
-    const embed = buildSettingsEmbed(message.guild, guildDoc);
-    return message.reply({ embeds: [embed] });
+    if (action === 'view') {
+      const embed = buildSettingsEmbed(message.guild, guildDoc);
+      return message.reply({ embeds: [embed] });
+    }
+
+    // Default: Interactive Leveling Hub
+    const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
+    const embed = await levelingHub.buildHubEmbed(message.guild, guildDoc, message.author, isAdmin);
+    const components = levelingHub.buildHubComponents(isAdmin);
+    return message.reply({ embeds: [embed], components });
   }
 };
 
@@ -117,6 +145,6 @@ function buildSettingsEmbed(guild, guildDoc) {
       { name: 'Announcement Channel', value: channel, inline: true },
       { name: 'Role Rewards', value: `\`${rewardsCount} roles\``, inline: true }
     )
-    .setFooter({ text: 'Edit anytime via commands' })
+    .setFooter({ text: 'Edit anytime via commands or interactive hub' })
     .setTimestamp();
 }

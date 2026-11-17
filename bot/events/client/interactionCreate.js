@@ -81,6 +81,13 @@ module.exports = {
       else if (interaction.isButton()) {
         const customId = interaction.customId;
 
+        // Leveling interactive hub buttons: btn_level_
+        if (customId.startsWith('btn_level_')) {
+          const levelingHub = require('../../modules/levelingHub');
+          await levelingHub.handleButton(interaction, client);
+          return;
+        }
+
         // Temp Voice controls: vc_lock, vc_unlock, vc_hide, vc_show, vc_rename, vc_limit, vc_claim, vc_delete
         if (customId.startsWith('vc_')) {
           const voiceManager = require('../../modules/voiceManager');
@@ -161,6 +168,13 @@ module.exports = {
       // 3. Handle Modals
       else if (interaction.isModalSubmit()) {
         const customId = interaction.customId;
+
+        // Leveling interactive hub modals: modal_level_
+        if (customId.startsWith('modal_level_')) {
+          const levelingHub = require('../../modules/levelingHub');
+          await levelingHub.handleModal(interaction, client);
+          return;
+        }
 
         // Temp Voice modals: modal_vc_rename_, modal_vc_limit_
         if (customId.startsWith('modal_vc_')) {

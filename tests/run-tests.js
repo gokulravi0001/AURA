@@ -1328,6 +1328,113 @@ function createServerTagTestContext(options = {}) {
     assert.ok(deniedReply.content.includes('Manage Expressions / Emojis'), 'Must reject user lacking permissions');
   });
 
+  // 25. Interactive Leveling Hub & Admin-Only Visibility Controls
+  await asyncTest('Features: Interactive Leveling Hub & Admin-Only Visibility Controls', async () => {
+    const levelingHub = require('../bot/modules/levelingHub');
+    const levelCmd = require('../bot/commands/leveling/levelsettings');
+    const UserXP = require('../models/UserXP');
+    const Guild = require('../models/Guild');
+
+    const origGuildFindOne = Guild.findOne;
+    const origUserXpFindOne = UserXP.findOne;
+    const origUserXpCount = UserXP.countDocuments;
+    Guild.findOne = async () => mockGuildDoc;
+    UserXP.findOne = async () => ({ xp: 120, level: 2, totalMessages: 15 });
+    UserXP.countDocuments = async () => 3;
+
+    // 1. Verify Command Aliases & Setup
+    assert.strictEqual(levelCmd.name, 'levels');
+    assert.ok(levelCmd.aliases.includes('level'));
+    assert.ok(levelCmd.aliases.includes('xp'));
+    assert.ok(levelCmd.aliases.includes('leveling'));
+
+    const mockGuild = {
+      id: 'guild_level_hub_1',
+      name: 'Hub Test Guild',
+      iconURL: () => 'https://example.com/icon.png',
+      roles: {
+        cache: new Map([
+          ['role_vip_1', { id: 'role_vip_1', name: 'VIP Level 5' }]
+        ])
+      }
+    };
+    const mockGuildDoc = {
+      leveling: {
+        enabled: true,
+        xpMin: 20,
+        xpMax: 35,
+        cooldownSeconds: 45,
+        announcementChannelId: 'chan_ann_1',
+        roleRewards: [{ level: 5, roleId: 'role_vip_1' }]
+      }
+    };
+    const mockUser = { id: 'member_user_1', username: 'MemberTester', displayAvatarURL: () => 'https://example.com/avatar.png' };
+
+    // 2. Non-Admin View: Admin controls are NOT visible
+    const regularComponents = levelingHub.buildHubComponents(false);
+    assert.strictEqual(regularComponents.length, 1, 'Regular members must only see 1 action row');
+    const memberButtonIds = regularComponents[0].components.map(b => b.data.custom_id);
+    assert.deepStrictEqual(memberButtonIds, ['btn_level_myrank', 'btn_level_leaderboard', 'btn_level_rewards']);
+    assert.ok(!memberButtonIds.includes('btn_level_setup'), 'Admin setup must be hidden from regular members');
+    assert.ok(!memberButtonIds.includes('btn_level_addreward'), 'Admin rewards setup must be hidden');
+    assert.ok(!memberButtonIds.includes('btn_level_addxp'), 'Admin give XP must be hidden');
+    assert.ok(!memberButtonIds.includes('btn_level_reset'), 'Admin reset XP must be hidden');
+
+    // 3. Admin View: Both Member controls AND Admin action controls are visible
+    const adminComponents = levelingHub.buildHubComponents(true);
+    assert.strictEqual(adminComponents.length, 2, 'Administrators must see both Member and Admin rows');
+    const adminButtonIds = adminComponents[1].components.map(b => b.data.custom_id);
+    assert.deepStrictEqual(adminButtonIds, ['btn_level_setup', 'btn_level_addreward', 'btn_level_addxp', 'btn_level_reset']);
+
+    // 4. Verify Embed Contains Guidance and Correct Info
+    const hubEmbed = await levelingHub.buildHubEmbed(mockGuild, mockGuildDoc, mockUser, true);
+    assert.ok(hubEmbed.data.title.includes('Leveling & XP Hub'));
+    assert.ok(hubEmbed.data.description.includes('20 - 35 XP'));
+    assert.ok(hubEmbed.data.description.includes('45s'));
+
+    // 5. Test Button Action: Non-admin trying to click an admin button gets rejected
+    let replyPayload = null;
+    const fakeInteraction = {
+      customId: 'btn_level_setup',
+      guild: mockGuild,
+      user: mockUser,
+      member: {
+        id: mockUser.id,
+        permissions: { has: () => false }
+      },
+      reply: async (payload) => {
+        replyPayload = payload;
+        return payload;
+      }
+    };
+    await levelingHub.handleButton(fakeInteraction, {});
+    assert.ok(replyPayload && replyPayload.content.includes('reserved for **Administrators**'), 'Must block non-admin clicking admin button');
+
+    // 6. Test Member Button: My Rank Card works for everyone
+    let rankReply = null;
+    const memberInteraction = {
+      customId: 'btn_level_myrank',
+      guild: mockGuild,
+      user: mockUser,
+      member: {
+        id: mockUser.id,
+        permissions: { has: () => false }
+      },
+      reply: async (payload) => {
+        rankReply = payload;
+        return payload;
+      }
+    };
+    await levelingHub.handleButton(memberInteraction, {});
+    assert.ok(rankReply && rankReply.embeds && rankReply.embeds.length === 1, 'My Rank button must return personal rank embed');
+    assert.strictEqual(rankReply.ephemeral, true, 'My Rank response should be ephemeral to keep chat clean');
+
+    // Restore stubs
+    Guild.findOne = origGuildFindOne;
+    UserXP.findOne = origUserXpFindOne;
+    UserXP.countDocuments = origUserXpCount;
+  });
+
   guildService.getSettings = originalGetSettings;
   guildService.updateSettings = originalUpdateSettings;
 

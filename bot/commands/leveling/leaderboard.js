@@ -8,7 +8,7 @@ module.exports = {
     .setDescription('View the top 10 ranked members on this server'),
   name: 'top',
   description: 'View the top 10 ranked members on this server',
-  aliases: ['lb', 'leaderboard', 'levels'],
+  aliases: ['lb', 'leaderboard'],
   module: 'leveling',
 
   async execute(interaction, client) {
