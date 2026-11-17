@@ -1,23 +1,17 @@
 {
   "name": "aura-discord-bot",
   "version": "1.0.0",
-  "description": "AURA - All-In-One Multipurpose Discord Bot with Web Dashboard",
+  "description": "AURA - All-In-One Multipurpose Discord Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
     "deploy:commands": "node bot/deploy-commands.js",
-    "dashboard:install": "cd dashboard && npm install",
-    "dashboard:dev": "cd dashboard && npm run dev",
-    "dashboard:build": "cd dashboard && npm run build",
     "test": "node tests/run-tests.js"
   },
   "keywords": [
     "discord-bot",
     "discord.js",
-    "dashboard",
-    "react",
-    "tailwind",
     "leveling",
     "tickets",
     "voice",

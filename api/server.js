@@ -92,13 +92,14 @@ function createServer() {
     });
   });
 
-  // Serve React dashboard static files in production if present
-  const distPath = path.join(__dirname, '../dashboard/dist');
-  app.use(express.static(distPath));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
-    res.sendFile(path.join(distPath, 'index.html'), (err) => {
-      if (err) next();
+  // Root health check endpoint for Render / external pingers
+  app.get('/', (req, res) => {
+    res.json({
+      status: 'online',
+      bot: client.user ? client.user.tag : 'AURA',
+      uptime: process.uptime(),
+      ping: client.ws?.ping ?? null,
+      timestamp: new Date().toISOString()
     });
   });
 

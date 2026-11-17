@@ -117,6 +117,6 @@ function buildSettingsEmbed(guild, guildDoc) {
       { name: 'Announcement Channel', value: channel, inline: true },
       { name: 'Role Rewards', value: `\`${rewardsCount} roles\``, inline: true }
     )
-    .setFooter({ text: 'Edit anytime via commands or web dashboard' })
+    .setFooter({ text: 'Edit anytime via commands' })
     .setTimestamp();
 }

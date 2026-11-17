@@ -158,7 +158,7 @@ async function handleAction({ guild, caller, client, settings, action, role = nu
       .setTitle(`🛑 Server Tag Auto Role Turned OFF — ${guild.name}`)
       .setDescription(
         'Automatic Server Tag role assignment and removal is now **OFF**.\n' +
-        'Your configured role has been kept saved so you can re-enable anytime with `/servertag on` or in the Web Dashboard.'
+        'Your configured role has been kept saved so you can re-enable anytime with `/servertag on`.'
       )
       .setTimestamp();
 

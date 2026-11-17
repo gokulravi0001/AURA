@@ -4,9 +4,9 @@ const { COLORS } = require('../../../shared/constants');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('help')
-    .setDescription('Explore all AURA commands, features, and dashboard link'),
+    .setDescription('Explore all AURA commands and features'),
   name: 'help',
-  description: 'Explore all AURA commands, features, and dashboard link',
+  description: 'Explore all AURA commands and features',
   aliases: ['h', 'commands'],
 
   async execute(interaction, client, settings) {
@@ -28,7 +28,7 @@ function buildHelpEmbed(prefix, client) {
   return new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
     .setTitle('⚡ AURA Command Menu')
-    .setDescription(`All commands are short and fast to use with **\`${prefix}\`** or **Slash commands** (\`/\`).\nClick the button below to open the Web Dashboard anytime!`)
+    .setDescription(`All commands are short and fast to use with **\`${prefix}\`** or **Slash commands** (\`/\`).`)
     .addFields(
       {
         name: '🎂 Birthdays (Auto-Delete & DM Confirmation)',
@@ -96,13 +96,7 @@ function buildHelpEmbed(prefix, client) {
 }
 
 function buildHelpButtons() {
-  const dashboardUrl = process.env.DASHBOARD_URL || 'https://dashboard-alpha-lovat.vercel.app';
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel('Open Web Dashboard')
-      .setURL(dashboardUrl)
-      .setStyle(ButtonStyle.Link)
-      .setEmoji('🌐'),
     new ButtonBuilder()
       .setLabel('Invite AURA')
       .setURL(`https://discord.com/oauth2/authorize?client_id=${process.env.DISCORD_CLIENT_ID || '1550194365635362876'}&permissions=8&scope=bot%20applications.commands`)

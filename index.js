@@ -10,7 +10,7 @@ const loadEvents = require('./bot/handlers/eventHandler');
 
 async function startAura() {
   logger.info('=============================================');
-  logger.info('  STARTING AURA: MULTIPURPOSE BOT & DASHBOARD');
+  logger.info('      STARTING AURA: MULTIPURPOSE BOT        ');
   logger.info('=============================================');
 
   // 1. Connect to MongoDB
@@ -25,8 +25,7 @@ async function startAura() {
   const PORT = process.env.PORT || 5000;
 
   server.listen(PORT, () => {
-    logger.api(`AURA API & Socket.IO Server running on port ${PORT}`);
-    logger.api(`Dashboard URL configured as: ${process.env.DASHBOARD_URL || 'http://localhost:5173'}`);
+    logger.api(`AURA Health & API Server running on port ${PORT}`);
   });
 
   // 4. Log in to Discord if token is configured

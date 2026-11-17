@@ -120,6 +120,6 @@ function buildThreadStatusEmbed(guild, guildDoc) {
       { name: 'Status', value: conf?.enabled ? '✅ Active' : '❌ Disabled', inline: true },
       { name: 'Monitored Channel', value: channel, inline: true }
     )
-    .setFooter({ text: 'Configure with +thread setup #channel or web dashboard' })
+    .setFooter({ text: 'Configure with +thread setup #channel' })
     .setTimestamp();
 }

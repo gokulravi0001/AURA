@@ -126,7 +126,7 @@ const ticketManager = {
       const closeEmbed = new EmbedBuilder()
         .setColor(COLORS.WARNING)
         .setTitle('🔒 Ticket Closed')
-        .setDescription(`This ticket was closed by <@${user.id}>.\nTranscript has been saved to the dashboard database.`);
+        .setDescription(`This ticket was closed by <@${user.id}>.\nTranscript has been saved to the database.`);
 
       return await interaction.followUp({ embeds: [closeEmbed], components: [closeRow] });
     }
