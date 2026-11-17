@@ -207,6 +207,13 @@ module.exports = {
       else if (interaction.isStringSelectMenu()) {
         const customId = interaction.customId;
 
+        // Leveling interactive hub action select menu
+        if (customId === 'select_level_action') {
+          const levelingHub = require('../../modules/levelingHub');
+          await levelingHub.handleSelectMenu(interaction, client);
+          return;
+        }
+
         // Module toggle select menu
         if (customId === 'select_module_toggle') {
           if (!isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client)) {
@@ -240,6 +247,18 @@ module.exports = {
         const handler = client.selectMenus.get(customId);
         if (handler) {
           await handler(interaction, client);
+        }
+      }
+
+      // 5. Handle Channel Select Menus
+      else if (interaction.isChannelSelectMenu()) {
+        const customId = interaction.customId;
+
+        // Level announcement channel picker
+        if (customId === 'select_level_channel') {
+          const levelingHub = require('../../modules/levelingHub');
+          await levelingHub.handleChannelSelect(interaction, client);
+          return;
         }
       }
     } catch (err) {

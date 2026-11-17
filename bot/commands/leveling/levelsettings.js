@@ -98,7 +98,7 @@ module.exports = {
     // Default: Interactive Leveling Hub
     const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
     const embed = await levelingHub.buildHubEmbed(interaction.guild, guildDoc, interaction.user, isAdmin);
-    const components = levelingHub.buildHubComponents(isAdmin);
+    const components = levelingHub.buildHubComponents(isAdmin, guildDoc);
     return interaction.reply({ embeds: [embed], components });
   },
 
@@ -125,7 +125,7 @@ module.exports = {
     // Default: Interactive Leveling Hub
     const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
     const embed = await levelingHub.buildHubEmbed(message.guild, guildDoc, message.author, isAdmin);
-    const components = levelingHub.buildHubComponents(isAdmin);
+    const components = levelingHub.buildHubComponents(isAdmin, guildDoc);
     return message.reply({ embeds: [embed], components });
   }
 };

@@ -1339,7 +1339,11 @@ function createServerTagTestContext(options = {}) {
     const origUserXpFindOne = UserXP.findOne;
     const origUserXpCount = UserXP.countDocuments;
     Guild.findOne = async () => mockGuildDoc;
-    UserXP.findOne = async () => ({ xp: 120, level: 2, totalMessages: 15 });
+    UserXP.findOne = () => {
+      const p = Promise.resolve({ xp: 120, level: 2, totalMessages: 15 });
+      p.sort = () => p;
+      return p;
+    };
     UserXP.countDocuments = async () => 3;
 
     // 1. Verify Command Aliases & Setup
@@ -1370,27 +1374,41 @@ function createServerTagTestContext(options = {}) {
     };
     const mockUser = { id: 'member_user_1', username: 'MemberTester', displayAvatarURL: () => 'https://example.com/avatar.png' };
 
-    // 2. Non-Admin View: Admin controls are NOT visible
-    const regularComponents = levelingHub.buildHubComponents(false);
-    assert.strictEqual(regularComponents.length, 1, 'Regular members must only see 1 action row');
-    const memberButtonIds = regularComponents[0].components.map(b => b.data.custom_id);
+    // 2. Non-Admin View: Admin controls are NOT visible in dropdown or buttons
+    const regularComponents = levelingHub.buildHubComponents(false, mockGuildDoc);
+    assert.strictEqual(regularComponents.length, 2, 'Regular members see dropdown + member buttons row');
+    const regularDropdownOptions = regularComponents[0].components[0].options.map(o => o.data.value);
+    assert.deepStrictEqual(regularDropdownOptions, ['act_myrank', 'act_leaderboard', 'act_rewards']);
+    assert.ok(!regularDropdownOptions.includes('act_toggle'), 'Admin toggle must be hidden from regular dropdown');
+    assert.ok(!regularDropdownOptions.includes('act_rates'), 'Admin rates must be hidden from regular dropdown');
+
+    const memberButtonIds = regularComponents[1].components.map(b => b.data.custom_id);
     assert.deepStrictEqual(memberButtonIds, ['btn_level_myrank', 'btn_level_leaderboard', 'btn_level_rewards']);
-    assert.ok(!memberButtonIds.includes('btn_level_setup'), 'Admin setup must be hidden from regular members');
-    assert.ok(!memberButtonIds.includes('btn_level_addreward'), 'Admin rewards setup must be hidden');
+    assert.ok(!memberButtonIds.includes('btn_level_toggle'), 'Admin toggle button must be hidden from regular members');
+    assert.ok(!memberButtonIds.includes('btn_level_open_rates'), 'Admin rates must be hidden');
     assert.ok(!memberButtonIds.includes('btn_level_addxp'), 'Admin give XP must be hidden');
     assert.ok(!memberButtonIds.includes('btn_level_reset'), 'Admin reset XP must be hidden');
 
     // 3. Admin View: Both Member controls AND Admin action controls are visible
-    const adminComponents = levelingHub.buildHubComponents(true);
-    assert.strictEqual(adminComponents.length, 2, 'Administrators must see both Member and Admin rows');
-    const adminButtonIds = adminComponents[1].components.map(b => b.data.custom_id);
-    assert.deepStrictEqual(adminButtonIds, ['btn_level_setup', 'btn_level_addreward', 'btn_level_addxp', 'btn_level_reset']);
+    const adminComponents = levelingHub.buildHubComponents(true, mockGuildDoc);
+    assert.strictEqual(adminComponents.length, 4, 'Administrators must see Dropdown, Member row, Admin settings row, and Admin XP tools row');
+    const adminDropdownOptions = adminComponents[0].components[0].options.map(o => o.data.value);
+    assert.ok(adminDropdownOptions.includes('act_toggle'));
+    assert.ok(adminDropdownOptions.includes('act_channel_picker'));
+    assert.ok(adminDropdownOptions.includes('act_rates'));
+    assert.ok(adminDropdownOptions.includes('act_add_reward'));
+    assert.ok(adminDropdownOptions.includes('act_give_xp'));
+    assert.ok(adminDropdownOptions.includes('act_deduct_xp'));
+    assert.ok(adminDropdownOptions.includes('act_reset_xp'));
 
-    // 4. Verify Embed Contains Guidance and Correct Info
+    // 4. Verify Embed Contains Server Leveling Setup & Guidance
     const hubEmbed = await levelingHub.buildHubEmbed(mockGuild, mockGuildDoc, mockUser, true);
-    assert.ok(hubEmbed.data.title.includes('Leveling & XP Hub'));
-    assert.ok(hubEmbed.data.description.includes('20 - 35 XP'));
-    assert.ok(hubEmbed.data.description.includes('45s'));
+    assert.ok(hubEmbed.data.title.includes('Leveling & XP System'));
+    assert.ok(hubEmbed.data.fields.find(f => f.name.includes('Server Leveling Setup')));
+    const setupField = hubEmbed.data.fields.find(f => f.name.includes('Server Leveling Setup'));
+    assert.ok(setupField.value.includes('20 - 35 XP'));
+    assert.ok(setupField.value.includes('45 seconds'));
+    assert.ok(setupField.value.includes('chan_ann_1'));
 
     // 5. Test Button Action: Non-admin trying to click an admin button gets rejected
     let replyPayload = null;
