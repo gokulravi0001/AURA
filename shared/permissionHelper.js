@@ -1,5 +1,6 @@
 const { PermissionsBitField } = require('discord.js');
 const whitelistService = require('./whitelistService');
+const trustedService = require('./trustedService');
 
 // Known Bot Developer / Owner Discord IDs (Team Members: redflash00._95995 & .ahl_1)
 const DEFAULT_BOT_OWNERS = [
@@ -43,15 +44,15 @@ function isBotOwner(userId, client = null) {
 }
 
 /**
- * Checks whether a user/member can manage the server or global whitelist.
- * ONLY the Bot Developer or Server Owner can manage whitelists.
+ * Checks whether a user/member can manage the server trusted members.
+ * ONLY the Bot Developer or Server Owner can manage trusted members.
  *
  * @param {import('discord.js').GuildMember|import('discord.js').User} userOrMember
  * @param {import('discord.js').Guild} guild
  * @param {import('discord.js').Client} [client]
  * @returns {boolean}
  */
-function canManageWhitelist(userOrMember, guild, client = null) {
+function canManageTrusted(userOrMember, guild, client = null) {
   if (!userOrMember) return false;
   const userId = userOrMember.id || userOrMember.user?.id;
   if (!userId) return false;
@@ -63,6 +64,19 @@ function canManageWhitelist(userOrMember, guild, client = null) {
   if (guild && guild.ownerId === userId) return true;
 
   return false;
+}
+
+/**
+ * Checks whether a user/member can manage the server or global whitelist.
+ * ONLY the Bot Developer or Server Owner can manage whitelists.
+ *
+ * @param {import('discord.js').GuildMember|import('discord.js').User} userOrMember
+ * @param {import('discord.js').Guild} guild
+ * @param {import('discord.js').Client} [client]
+ * @returns {boolean}
+ */
+function canManageWhitelist(userOrMember, guild, client = null) {
+  return canManageTrusted(userOrMember, guild, client);
 }
 
 /**
@@ -85,10 +99,13 @@ function isOwnerOrAdmin(userOrMember, guild, client = null, settings = null) {
   // 2. Server Owner
   if (guild && guild.ownerId === userId) return true;
 
-  // 3. Whitelisted Member (Server or Global)
+  // 3. Trusted Member (Can use commands without being admin or owner)
+  if (trustedService.isTrusted(userId, guild?.id, settings)) return true;
+
+  // 4. Whitelisted Member (Backwards compatibility)
   if (whitelistService.isWhitelisted(userId, guild?.id, settings)) return true;
 
-  // 4. Guild Administrator Permission
+  // 5. Guild Administrator Permission
   const member = userOrMember.permissions ? userOrMember : guild?.members?.cache?.get(userId);
   if (member?.permissions?.has(PermissionsBitField.Flags.Administrator)) return true;
 
@@ -96,7 +113,7 @@ function isOwnerOrAdmin(userOrMember, guild, client = null, settings = null) {
 }
 
 /**
- * Checks whether a member has a specific permission, or has Administrator / Server Owner / Bot Developer / Whitelist bypass.
+ * Checks whether a member has a specific permission, or has Administrator / Server Owner / Bot Developer / Trusted Member bypass.
  *
  * @param {import('discord.js').GuildMember|import('discord.js').User} member
  * @param {bigint|string} permission
@@ -115,13 +132,16 @@ function hasPermissionOrOwner(member, permission, client = null, settings = null
   // 2. Server Owner bypass
   if (member.guild && member.guild.ownerId === userId) return true;
 
-  // 3. Whitelisted Member bypass
+  // 3. Trusted Member bypass (Can use all commands without admin or owner)
+  if (trustedService.isTrusted(userId, member?.guild?.id, settings)) return true;
+
+  // 4. Whitelisted Member bypass (Backwards compatibility)
   if (whitelistService.isWhitelisted(userId, member?.guild?.id, settings)) return true;
 
-  // 4. Guild Administrator bypass
+  // 5. Guild Administrator bypass
   if (member.permissions?.has(PermissionsBitField.Flags.Administrator)) return true;
 
-  // 5. Specific Permission check
+  // 6. Specific Permission check
   if (permission && member.permissions?.has(permission)) return true;
 
   return false;
@@ -131,6 +151,7 @@ module.exports = {
   isBotOwner,
   isOwnerOrAdmin,
   hasPermissionOrOwner,
+  canManageTrusted,
   canManageWhitelist,
   DEFAULT_BOT_OWNERS
 };

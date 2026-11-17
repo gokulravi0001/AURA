@@ -412,64 +412,55 @@ test('Features: Bot Developer Global Permission Bypass', () => {
   assert.strictEqual(hasPermissionOrOwner(mockRandomUser, 0x0000000000002000n), false, 'Regular user without permission must not bypass');
 });
 
-// 16. Whitelist Command & Permission Bypass Verification
-test('Features: Whitelist Command & Permission Bypass', () => {
-  const whitelistCmd = require('../bot/commands/general/whitelist');
-  const whitelistService = require('../shared/whitelistService');
-  const { isOwnerOrAdmin, hasPermissionOrOwner, canManageWhitelist } = require('../shared/permissionHelper');
+// 16. Trusted Member System Verification (/trusted)
+test('Features: Trusted Member System & Permission Bypass (/trusted)', () => {
+  const trustedCmd = require('../bot/commands/general/trusted');
+  const trustedService = require('../shared/trustedService');
+  const { isOwnerOrAdmin, hasPermissionOrOwner, canManageTrusted } = require('../shared/permissionHelper');
 
   // Verify command metadata
-  assert.strictEqual(whitelistCmd.name, 'whitelist');
-  assert.ok(whitelistCmd.aliases.includes('wl'));
-  const json = whitelistCmd.data.toJSON();
-  assert.strictEqual(json.name, 'whitelist');
-  assert.ok(json.options.find(o => o.name === 'add'));
+  assert.strictEqual(trustedCmd.name, 'trusted');
+  assert.ok(trustedCmd.aliases.includes('trust'));
+  assert.ok(trustedCmd.aliases.includes('trustedmember'));
+  assert.ok(trustedCmd.aliases.includes('trustedmembers'));
+  const json = trustedCmd.data.toJSON();
+  assert.strictEqual(json.name, 'trusted');
+  assert.ok(json.options.find(o => o.name === 'set'));
   assert.ok(json.options.find(o => o.name === 'remove'));
   assert.ok(json.options.find(o => o.name === 'list'));
   assert.ok(json.options.find(o => o.name === 'clear'));
 
-  // Verify canManageWhitelist: Only Server Owner and Bot Owner can manage
+  // Verify canManageTrusted: Only Server Owner and Bot Owner can manage
   const mockGuild = { id: 'guild_test_1', ownerId: 'owner_user_1', members: { cache: new Map() } };
   const botDevUser = { id: '1487429529717706842' };
   const serverOwnerUser = { id: 'owner_user_1' };
   const regularUser = { id: 'regular_user_888' };
-  const whitelistedUser = { id: 'whitelisted_user_777' };
+  const trustedUser = { id: 'trusted_user_777' };
 
-  assert.strictEqual(canManageWhitelist(botDevUser, mockGuild), true, 'Bot developer must manage whitelist');
-  assert.strictEqual(canManageWhitelist(serverOwnerUser, mockGuild), true, 'Server owner must manage whitelist');
-  assert.strictEqual(canManageWhitelist(regularUser, mockGuild), false, 'Regular member cannot manage whitelist');
-  assert.strictEqual(canManageWhitelist(whitelistedUser, mockGuild), false, 'Whitelisted member cannot manage whitelist itself');
+  assert.strictEqual(canManageTrusted(botDevUser, mockGuild), true, 'Bot developer must manage trusted members');
+  assert.strictEqual(canManageTrusted(serverOwnerUser, mockGuild), true, 'Server owner must manage trusted members');
+  assert.strictEqual(canManageTrusted(regularUser, mockGuild), false, 'Regular member cannot manage trusted members');
+  assert.strictEqual(canManageTrusted(trustedUser, mockGuild), false, 'Trusted member cannot manage trusted list itself');
 
-  // Verify isWhitelisted functionality with settings.whitelist
-  const mockSettings = { whitelist: ['whitelisted_user_777'] };
-  assert.strictEqual(whitelistService.isWhitelisted('whitelisted_user_777', 'guild_test_1', mockSettings), true);
-  assert.strictEqual(whitelistService.isWhitelisted('regular_user_888', 'guild_test_1', mockSettings), false);
+  // Verify isTrusted functionality with settings.trustedMembers
+  const mockSettings = { trustedMembers: ['trusted_user_777'] };
+  assert.strictEqual(trustedService.isTrusted('trusted_user_777', 'guild_test_1', mockSettings), true);
+  assert.strictEqual(trustedService.isTrusted('regular_user_888', 'guild_test_1', mockSettings), false);
 
-  // Verify isOwnerOrAdmin allows whitelisted user even with 0 administrator permissions
-  assert.strictEqual(isOwnerOrAdmin(whitelistedUser, mockGuild, null, mockSettings), true, 'Whitelisted user must pass isOwnerOrAdmin');
-  assert.strictEqual(isOwnerOrAdmin(regularUser, mockGuild, null, mockSettings), false, 'Non-whitelisted user without admin must fail');
+  // Verify isOwnerOrAdmin allows trusted user even with 0 administrator permissions
+  assert.strictEqual(isOwnerOrAdmin(trustedUser, mockGuild, null, mockSettings), true, 'Trusted user must pass isOwnerOrAdmin');
+  assert.strictEqual(isOwnerOrAdmin(regularUser, mockGuild, null, mockSettings), false, 'Non-trusted user without admin must fail');
 
-  // Verify hasPermissionOrOwner allows whitelisted user
-  assert.strictEqual(hasPermissionOrOwner(whitelistedUser, 0x0000000000002000n, null, mockSettings), true, 'Whitelisted user must pass hasPermissionOrOwner');
-  assert.strictEqual(hasPermissionOrOwner(regularUser, 0x0000000000002000n, null, mockSettings), false, 'Non-whitelisted user must fail');
+  // Verify hasPermissionOrOwner allows trusted user
+  assert.strictEqual(hasPermissionOrOwner(trustedUser, 0x0000000000002000n, null, mockSettings), true, 'Trusted user must pass hasPermissionOrOwner');
+  assert.strictEqual(hasPermissionOrOwner(regularUser, 0x0000000000002000n, null, mockSettings), false, 'Non-trusted user must fail');
 });
 
 // 20. Immunity System Verification
-test('Features: Immunity System & VC Command Protection', () => {
-  const immunityCmd = require('../bot/commands/general/immunity');
+test('Features: Immunity System & Administrator Immunity Protection', () => {
   const immunityService = require('../shared/immunityService');
-
-  // Verify command metadata
-  assert.strictEqual(immunityCmd.name, 'immunity');
-  assert.ok(immunityCmd.aliases.includes('imunity'));
-  assert.ok(immunityCmd.aliases.includes('immune'));
-  const json = immunityCmd.data.toJSON();
-  assert.strictEqual(json.name, 'immunity');
-  assert.ok(json.options.find(o => o.name === 'add'));
-  assert.ok(json.options.find(o => o.name === 'remove'));
-  assert.ok(json.options.find(o => o.name === 'role'));
-  assert.ok(json.options.find(o => o.name === 'list'));
-  assert.ok(json.options.find(o => o.name === 'clear'));
+  const trustedService = require('../shared/trustedService');
+  const { PermissionsBitField } = require('discord.js');
 
   // Verify User ID 1487429529717706842 has permanent absolute immunity
   assert.strictEqual(immunityService.isImmune('1487429529717706842'), true, 'User 1487429529717706842 must have permanent absolute immunity');
@@ -495,22 +486,38 @@ test('Features: Immunity System & VC Command Protection', () => {
   // Verify regular user is not immune
   assert.strictEqual(immunityService.isImmune('random_user_555', mockGuild), false, 'Regular member must not be immune by default');
 
-  // Verify server-configured immune user via settings
-  const immuneSettings = { immunity: { users: ['immune_vip_123'], roles: ['immune_role_456'] } };
-  assert.strictEqual(immunityService.isImmune('immune_vip_123', mockGuild, null, immuneSettings), true, 'User in settings.immunity.users must be immune');
-  assert.strictEqual(immunityService.isImmune('random_user_555', mockGuild, null, immuneSettings), false, 'User not in settings must not be immune');
+  // Verify administrator permission grants immunity
+  const adminMember = {
+    id: 'admin_user_111',
+    permissions: {
+      has: (flag) => flag === PermissionsBitField.Flags.Administrator
+    }
+  };
+  assert.strictEqual(immunityService.isImmune(adminMember, mockGuild), true, 'Member with Administrator permission must have immunity');
 
-  // Verify role immunity
-  const mockMemberWithRole = {
-    id: 'role_member_777',
-    roles: { cache: new Map([['immune_role_456', { id: 'immune_role_456' }]]) }
+  // Verify administrator role grants immunity
+  const adminRoleMember = {
+    id: 'admin_role_member_222',
+    permissions: {
+      has: () => false
+    },
+    roles: {
+      cache: new Map([
+        ['role_admin_1', {
+          id: 'role_admin_1',
+          permissions: {
+            has: (flag) => flag === PermissionsBitField.Flags.Administrator
+          }
+        }]
+      ])
+    }
   };
-  const mockMemberWithoutRole = {
-    id: 'no_role_member_888',
-    roles: { cache: new Map([['other_role_999', { id: 'other_role_999' }]]) }
-  };
-  assert.strictEqual(immunityService.isImmune(mockMemberWithRole, mockGuild, null, immuneSettings), true, 'Member with immune role must be immune');
-  assert.strictEqual(immunityService.isImmune(mockMemberWithoutRole, mockGuild, null, immuneSettings), false, 'Member without immune role must not be immune');
+  assert.strictEqual(immunityService.isImmune(adminRoleMember, mockGuild), true, 'Member with Administrator role must have immunity');
+
+  // Verify trusted member has immunity
+  const trustedSettings = { trustedMembers: ['trusted_vip_123'] };
+  assert.strictEqual(immunityService.isImmune('trusted_vip_123', mockGuild, null, trustedSettings), true, 'Trusted member must have immunity');
+  assert.strictEqual(immunityService.isImmune('random_user_555', mockGuild, null, trustedSettings), false, 'Non-trusted member must not have immunity');
 });
 
 // 21. Auto-Delete & Shadow-Mute Verification (/autodlt)

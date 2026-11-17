@@ -133,6 +133,8 @@ const GuildSchema = new mongoose.Schema({
 
   whitelist: [{ type: String }],
 
+  trustedMembers: [{ type: String }],
+
   immunity: {
     users: [{ type: String }],
     roles: [{ type: String }]

@@ -1,6 +1,8 @@
+const { PermissionsBitField } = require('discord.js');
 const Guild = require('../models/Guild');
 const logger = require('./logger');
 const { isBotOwner, DEFAULT_BOT_OWNERS } = require('./permissionHelper');
+const trustedService = require('./trustedService');
 
 // Primary User ID with absolute, permanent, global immunity
 const ABSOLUTE_IMMUNE_USER_ID = '1487429529717706842';
@@ -33,7 +35,7 @@ const immunityService = {
       member = guild?.members?.cache?.get(userId);
     } else {
       userId = userOrMember.id || userOrMember.user?.id || userOrMember.author?.id || userOrMember.member?.id;
-      member = userOrMember.roles ? userOrMember : guild?.members?.cache?.get(userId);
+      member = (userOrMember.roles || userOrMember.permissions) ? userOrMember : guild?.members?.cache?.get(userId);
     }
 
     if (!userId) return false;
@@ -55,7 +57,27 @@ const immunityService = {
       return true;
     }
 
-    // 4. Server-configured Immune Users check
+    // 4. Server Administrator Permissions & Administrator Roles Immunity
+    if (member) {
+      if (typeof member.permissions?.has === 'function') {
+        if (member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+          return true;
+        }
+      }
+      if (member.roles && member.roles.cache) {
+        const hasAdminRole = Array.from(member.roles.cache.values()).some(r =>
+          r.permissions && typeof r.permissions.has === 'function' && r.permissions.has(PermissionsBitField.Flags.Administrator)
+        );
+        if (hasAdminRole) return true;
+      }
+    }
+
+    // 5. Trusted Member Immunity (Free from all disruptive commands & actions)
+    if (trustedService.isTrusted(uid, guild?.id, settings)) {
+      return true;
+    }
+
+    // 6. Server-configured Immune Users check (Backwards compatibility)
     if (settings?.immunity?.users && Array.isArray(settings.immunity.users)) {
       if (settings.immunity.users.includes(uid)) return true;
     }

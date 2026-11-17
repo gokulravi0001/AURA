@@ -4,6 +4,7 @@ const guildService = require('../../../shared/guildService');
 const { COLORS } = require('../../../shared/constants');
 const { isBotOwner, isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const whitelistService = require('../../../shared/whitelistService');
+const trustedService = require('../../../shared/trustedService');
 
 module.exports = {
   name: 'interactionCreate',
@@ -30,7 +31,8 @@ module.exports = {
 
         const isSetupSubcommand = ['setup', 'enable', 'config'].includes(sub);
         const isBotDev = isBotOwner(interaction.user.id, client);
-        const isWhitelisted = whitelistService.isWhitelisted(interaction.user.id, interaction.guildId, settings);
+        const isTrusted = trustedService.isTrusted(interaction.user.id, interaction.guildId, settings);
+        const isWhitelisted = isTrusted || whitelistService.isWhitelisted(interaction.user.id, interaction.guildId, settings);
         const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client, settings);
 
         if (command.module && settings && settings.modules && settings.modules[command.module] === false && !isBotDev && !isWhitelisted) {

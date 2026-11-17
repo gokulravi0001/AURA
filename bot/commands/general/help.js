@@ -71,16 +71,12 @@ function buildHelpEmbed(prefix, client) {
         value: `\`${prefix}modules\` • \`${prefix}modules on <feature|all>\` • \`${prefix}modules off <feature|all>\` • \`${prefix}modules toggle <feature>\`\n*Interactively enable or disable any bot feature selectively with dropdown menus & buttons!*`
       },
       {
-        name: '🛡️ Whitelist (Bypass Admin Permissions)',
-        value: `\`${prefix}whitelist add @user\` • \`${prefix}whitelist remove @user\` • \`${prefix}whitelist list\` • \`${prefix}whitelist clear\`\n*Whitelist members so they can run all commands without needing Discord Administrator permissions! (Owner & Bot Dev only)*`
+        name: '⭐ Trusted Members (Full Immunity & Command Access)',
+        value: `\`${prefix}trusted set @user\` • \`${prefix}trusted remove @user\` • \`${prefix}trusted list\` • \`${prefix}trusted clear\`\n*Set trusted members who are completely free from all disruptive actions (\`/bounce\`, \`/autodlt\`, \`/vc mute\`) AND can use all bot commands without being an admin or owner! (Server Owner & Bot Dev only)*`
       },
       {
         name: '🔒 Inviter Role Guard (Exclusive Invite Generation)',
         value: `\`${prefix}inviterole set @role\` • \`${prefix}inviterole view\` • \`${prefix}inviterole sync\` • \`${prefix}inviterole clean\` • \`${prefix}inviterole disable\`\n*Locks invite creation exclusively to the designated role! Denies @everyone from creating invites, intercepts and deletes unauthorized invite links instantly, and blocks chat invite links.*`
-      },
-      {
-        name: '🛡️ Immunity System (Immunity from Disruptive Actions)',
-        value: `\`${prefix}immunity add @user\` • \`${prefix}immunity remove @user\` • \`${prefix}immunity role @role\` • \`${prefix}immunity list\` • \`${prefix}immunity clear\`\n*Protects members and roles with absolute Immunity against disruptive bot commands (\`/bounce\`, \`/vc disconnect\`, \`/vc mute\`, \`/autodelete\`, etc.)!*`
       },
       {
         name: '⚡ Auto-Delete Within 1s (/autodlt)',
