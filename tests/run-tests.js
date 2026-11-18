@@ -1453,6 +1453,136 @@ function createServerTagTestContext(options = {}) {
     UserXP.countDocuments = origUserXpCount;
   });
 
+  // 30. All-in-One Categorized Interactive Guidance Hubs & Permission Filtering
+  test('Features: Categorized Interactive Guidance Hubs (Birthdays, Voice, Tickets, Server Tools, Minigames)', async () => {
+    const birthdayHub = require('../bot/modules/birthdayHub');
+    const voiceHub = require('../bot/modules/voiceHub');
+    const ticketHub = require('../bot/modules/ticketHub');
+    const serverToolsHub = require('../bot/modules/serverToolsHub');
+    const gamesHub = require('../bot/modules/gamesHub');
+    const Birthday = require('../models/Birthday');
+    const TempVoice = require('../models/TempVoice');
+    const Ticket = require('../models/Ticket');
+
+    // Mock models
+    const origBdayCount = Birthday.countDocuments;
+    const origBdayFindOne = Birthday.findOne;
+    const origBdayFind = Birthday.find;
+    const origTvCount = TempVoice.countDocuments;
+    const origTvFindOne = TempVoice.findOne;
+    const origTicketCount = Ticket.countDocuments;
+    const origTicketFind = Ticket.find;
+    const origTicketFindOne = Ticket.findOne;
+
+    Birthday.countDocuments = async () => 12;
+    Birthday.findOne = async () => ({
+      userId: 'user_regular_1',
+      day: 24,
+      month: 10,
+      year: 2000,
+      timezone: 'Asia/Kolkata'
+    });
+    Birthday.find = () => ({
+      sort: () => ({
+        limit: async () => [
+          { userId: 'user_regular_1', day: 24, month: 10, timezone: 'Asia/Kolkata' }
+        ]
+      })
+    });
+
+    TempVoice.countDocuments = async () => 3;
+    TempVoice.findOne = async () => null;
+
+    Ticket.countDocuments = async () => 5;
+    Ticket.find = () => ({
+      limit: async () => []
+    });
+    Ticket.findOne = async () => null;
+
+    const mockGuild = {
+      id: 'guild_hub_test',
+      name: 'AURA Hub Test Community',
+      voiceStates: { cache: new Map() },
+      roles: { cache: new Map([['role_star', { id: 'role_star', name: 'Star' }]]) },
+      members: { cache: new Map() },
+      channels: { cache: new Map() }
+    };
+    const mockUser = { id: 'user_regular_1', username: 'TestUser' };
+    const mockMember = { id: 'user_regular_1', user: mockUser, permissions: { has: () => false } };
+    const mockGuildDoc = {
+      guildId: mockGuild.id,
+      birthdays: { enabled: true, wishChannelId: 'chan_bday_wish', setChannelId: 'chan_bday_input', roleId: 'role_star' },
+      joinToCreate: { enabled: true, channelId: 'chan_jtc_trigger', categoryId: 'cat_jtc' },
+      tickets: { enabled: true, categoryId: 'cat_tickets', staffRoleId: 'role_staff' },
+      serverTagRole: { enabled: true, roleId: 'role_star', activeMemberCount: 15 },
+      countingGame: { enabled: true, channelId: 'chan_count', currentNumber: 42, highScore: 100 },
+      wordChainGame: { enabled: true, channelId: 'chan_chain', lastWord: 'apple', currentStreak: 5, highScore: 25 }
+    };
+
+    // A. Test Birthday Hub
+    const bdayEmbed = await birthdayHub.buildHubEmbed(mockGuild, mockGuildDoc, mockUser, false);
+    assert.ok(bdayEmbed.data.title.includes('Birthday System'));
+    assert.ok(bdayEmbed.data.fields.find(f => f.name.includes('Server Birthday Setup')));
+    assert.ok(bdayEmbed.data.fields.find(f => f.name.includes('Your Birthday')));
+
+    const bdayMemberComponents = birthdayHub.buildHubComponents(false, mockGuildDoc);
+    assert.strictEqual(bdayMemberComponents.length, 2, 'Regular members only see 2 rows (select menu + member buttons)');
+    const bdayAdminComponents = birthdayHub.buildHubComponents(true, mockGuildDoc);
+    assert.strictEqual(bdayAdminComponents.length, 3, 'Admins see 3 rows including admin quick buttons');
+
+    // B. Test Voice Hub
+    const vcEmbed = await voiceHub.buildHubEmbed(mockGuild, mockGuildDoc, mockMember, false);
+    assert.ok(vcEmbed.data.title.includes('Voice System & Lounges'));
+    assert.ok(vcEmbed.data.fields.find(f => f.name.includes('Join-to-Create Voice Setup')));
+
+    const vcMemberComponents = voiceHub.buildHubComponents(mockMember, false, mockGuildDoc, null, null);
+    assert.strictEqual(vcMemberComponents.length, 2, 'Regular members not in lounge see 2 rows');
+    const vcAdminComponents = voiceHub.buildHubComponents(mockMember, true, mockGuildDoc, null, null);
+    assert.strictEqual(vcAdminComponents.length, 3, 'Admins see 3 rows including admin mass action buttons');
+
+    // C. Test Ticket Hub
+    const ticketEmbed = await ticketHub.buildHubEmbed(mockGuild, mockGuildDoc, mockUser, false);
+    assert.ok(ticketEmbed.data.title.includes('Support & Ticket System'));
+    assert.ok(ticketEmbed.data.fields.find(f => f.name.includes('Server Ticket Setup')));
+
+    const ticketMemberComponents = ticketHub.buildHubComponents(mockUser, false, mockGuildDoc, null);
+    assert.strictEqual(ticketMemberComponents.length, 2, 'Members see 2 rows');
+    const ticketAdminComponents = ticketHub.buildHubComponents(mockUser, true, mockGuildDoc, null);
+    assert.strictEqual(ticketAdminComponents.length, 3, 'Admins see 3 rows with deploy panel & setup');
+
+    // D. Test Server Tools Hub
+    const toolsEmbed = await serverToolsHub.buildHubEmbed(mockGuild, mockGuildDoc, mockUser, false);
+    assert.ok(toolsEmbed.data.title.includes('Server Tools & Growth Hub'));
+    assert.ok(toolsEmbed.data.fields.find(f => f.name.includes('Server Tag Auto-Role')));
+    assert.ok(toolsEmbed.data.fields.find(f => f.name.includes('Live Server Stat Counters')));
+
+    const toolsMemberComponents = serverToolsHub.buildHubComponents(false, mockGuildDoc);
+    const toolsAdminComponents = serverToolsHub.buildHubComponents(true, mockGuildDoc);
+    assert.ok(toolsAdminComponents[0].components[0].data.options.some(o => o.value === 'act_tools_sync_tag'));
+    assert.ok(!toolsMemberComponents[0].components[0].data.options.some(o => o.value === 'act_tools_sync_tag'), 'Non-admins must not see sync tag action');
+
+    // E. Test Minigames Hub
+    const gamesEmbed = await gamesHub.buildHubEmbed(mockGuild, mockGuildDoc, mockUser, false);
+    assert.ok(gamesEmbed.data.title.includes('Minigames & Activity'));
+    assert.ok(gamesEmbed.data.fields.find(f => f.name.includes('Counting Game')));
+    assert.ok(gamesEmbed.data.fields.find(f => f.name.includes('Word Chain Challenge')));
+
+    const gamesMemberComponents = gamesHub.buildHubComponents(false, mockGuildDoc);
+    assert.strictEqual(gamesMemberComponents.length, 2, 'Members see 2 rows (select menu + quick game buttons)');
+    const gamesAdminComponents = gamesHub.buildHubComponents(true, mockGuildDoc);
+    assert.strictEqual(gamesAdminComponents.length, 3, 'Admins see 3 rows including setup channels row');
+
+    // Restore stubs
+    Birthday.countDocuments = origBdayCount;
+    Birthday.findOne = origBdayFindOne;
+    Birthday.find = origBdayFind;
+    TempVoice.countDocuments = origTvCount;
+    TempVoice.findOne = origTvFindOne;
+    Ticket.countDocuments = origTicketCount;
+    Ticket.find = origTicketFind;
+    Ticket.findOne = origTicketFindOne;
+  });
+
   guildService.getSettings = originalGetSettings;
   guildService.updateSettings = originalUpdateSettings;
 

@@ -11,11 +11,16 @@ const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const bounceManager = require('../../modules/bounceManager');
 const immunityService = require('../../../shared/immunityService');
+const voiceHub = require('../../modules/voiceHub');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('vc')
     .setDescription('Manage your temporary voice lounge or setup Join-to-Create')
+    .addSubcommand(sub =>
+      sub.setName('hub')
+        .setDescription('Open the interactive Voice & Lounges guidance and control hub')
+    )
     .addSubcommand(sub =>
       sub.setName('setup')
         .setDescription('Create Join-to-Create trigger channel and category automatically (Admin only)')
@@ -144,6 +149,19 @@ module.exports = {
 
   async execute(interaction, client, settings) {
     const sub = interaction.options.getSubcommand();
+
+    // HUB
+    if (sub === 'hub') {
+      const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
+      const isAdmin = isOwnerOrAdmin(member, interaction.guild, client);
+      const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+      const voiceState = interaction.guild.voiceStates.cache.get(member.id);
+      const voiceChannel = voiceState?.channel;
+      const tempDoc = voiceChannel ? await TempVoice.findOne({ channelId: voiceChannel.id }) : null;
+      const embed = await voiceHub.buildHubEmbed(interaction.guild, guildDoc, member, isAdmin);
+      const components = voiceHub.buildHubComponents(member, isAdmin, guildDoc, voiceChannel, tempDoc);
+      return interaction.reply({ embeds: [embed], components, ephemeral: true });
+    }
 
     // 1. SETUP COMMAND (Admin only)
     if (sub === 'setup') {
@@ -661,6 +679,19 @@ module.exports = {
 
   async executePrefix(message, args, client, settings) {
     const action = args[0]?.toLowerCase();
+
+    // +vc (no args) or +vc hub
+    if (!action || action === 'hub' || action === 'menu') {
+      const member = message.member || await message.guild.members.fetch(message.author.id);
+      const isAdmin = isOwnerOrAdmin(member, message.guild, client);
+      const guildDoc = await Guild.findOne({ guildId: message.guild.id });
+      const voiceState = message.guild.voiceStates.cache.get(member.id);
+      const voiceChannel = voiceState?.channel;
+      const tempDoc = voiceChannel ? await TempVoice.findOne({ channelId: voiceChannel.id }) : null;
+      const embed = await voiceHub.buildHubEmbed(message.guild, guildDoc, member, isAdmin);
+      const components = voiceHub.buildHubComponents(member, isAdmin, guildDoc, voiceChannel, tempDoc);
+      return message.reply({ embeds: [embed], components });
+    }
 
     // +vc setup
     if (action === 'setup') {

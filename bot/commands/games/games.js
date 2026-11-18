@@ -8,6 +8,7 @@ const {
   ButtonStyle
 } = require('discord.js');
 const gamesManager = require('../../modules/gamesManager');
+const gamesHub = require('../../modules/gamesHub');
 const Guild = require('../../../models/Guild');
 const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
@@ -16,6 +17,10 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('games')
     .setDescription('Play minigames or configure game channels')
+    .addSubcommand(sub =>
+      sub.setName('hub')
+        .setDescription('Open the interactive Minigames & activity guidance hub')
+    )
     .addSubcommand(sub =>
       sub.setName('rps')
         .setDescription('Play Rock Paper Scissors with another user or the bot')
@@ -61,6 +66,14 @@ module.exports = {
   async execute(interaction, client) {
     const sub = interaction.options.getSubcommand();
     const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+
+    // HUB
+    if (sub === 'hub') {
+      const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
+      const embed = await gamesHub.buildHubEmbed(interaction.guild, guildDoc, interaction.user, isAdmin);
+      const components = gamesHub.buildHubComponents(isAdmin, guildDoc);
+      return interaction.reply({ embeds: [embed], components, ephemeral: true });
+    }
 
     // 1. RPS
     if (sub === 'rps') {
@@ -177,6 +190,15 @@ module.exports = {
   async executePrefix(message, args, client) {
     const commandUsed = message.content.slice(1).trim().split(/ +/)[0]?.toLowerCase();
     const action = args[0]?.toLowerCase();
+
+    // +games (no args) or +games hub
+    if (commandUsed === 'games' && (!action || action === 'hub' || action === 'menu')) {
+      const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
+      const guildDoc = await Guild.findOne({ guildId: message.guild.id });
+      const embed = await gamesHub.buildHubEmbed(message.guild, guildDoc, message.author, isAdmin);
+      const components = gamesHub.buildHubComponents(isAdmin, guildDoc);
+      return message.reply({ embeds: [embed], components });
+    }
 
     if (commandUsed === 'rps') {
       const opponent = message.mentions.users.first();

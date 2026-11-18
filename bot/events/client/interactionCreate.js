@@ -88,6 +88,41 @@ module.exports = {
           return;
         }
 
+        // Birthday interactive hub buttons: btn_bday_
+        if (customId.startsWith('btn_bday_')) {
+          const birthdayHub = require('../../modules/birthdayHub');
+          await birthdayHub.handleButton(interaction, client);
+          return;
+        }
+
+        // Voice interactive hub buttons: btn_vchub_
+        if (customId.startsWith('btn_vchub_')) {
+          const voiceHub = require('../../modules/voiceHub');
+          await voiceHub.handleButton(interaction, client);
+          return;
+        }
+
+        // Ticket interactive hub buttons: btn_tickethub_
+        if (customId.startsWith('btn_tickethub_')) {
+          const ticketHub = require('../../modules/ticketHub');
+          await ticketHub.handleButton(interaction, client);
+          return;
+        }
+
+        // Server tools interactive hub buttons: btn_tools_
+        if (customId.startsWith('btn_tools_')) {
+          const serverToolsHub = require('../../modules/serverToolsHub');
+          await serverToolsHub.handleButton(interaction, client);
+          return;
+        }
+
+        // Games interactive hub buttons: btn_games_
+        if (customId.startsWith('btn_games_')) {
+          const gamesHub = require('../../modules/gamesHub');
+          await gamesHub.handleButton(interaction, client);
+          return;
+        }
+
         // Temp Voice controls: vc_lock, vc_unlock, vc_hide, vc_show, vc_rename, vc_limit, vc_claim, vc_delete
         if (customId.startsWith('vc_')) {
           const voiceManager = require('../../modules/voiceManager');
@@ -183,6 +218,13 @@ module.exports = {
           return;
         }
 
+        // Voice interactive hub modals: modal_vchub_
+        if (customId.startsWith('modal_vchub_')) {
+          const voiceHub = require('../../modules/voiceHub');
+          await voiceHub.handleModal(interaction, client);
+          return;
+        }
+
         // Birthday registration modal
         if (customId === 'modal_birthday_register') {
           const birthdayService = require('../../modules/birthdayService');
@@ -211,6 +253,41 @@ module.exports = {
         if (customId === 'select_level_action') {
           const levelingHub = require('../../modules/levelingHub');
           await levelingHub.handleSelectMenu(interaction, client);
+          return;
+        }
+
+        // Birthday interactive hub action select menu
+        if (customId === 'select_bday_action') {
+          const birthdayHub = require('../../modules/birthdayHub');
+          await birthdayHub.handleSelectMenu(interaction, client);
+          return;
+        }
+
+        // Voice interactive hub action select menu
+        if (customId === 'select_vchub_action') {
+          const voiceHub = require('../../modules/voiceHub');
+          await voiceHub.handleSelectMenu(interaction, client);
+          return;
+        }
+
+        // Ticket interactive hub action select menu
+        if (customId === 'select_tickethub_action') {
+          const ticketHub = require('../../modules/ticketHub');
+          await ticketHub.handleSelectMenu(interaction, client);
+          return;
+        }
+
+        // Server tools interactive hub action select menu
+        if (customId === 'select_tools_action') {
+          const serverToolsHub = require('../../modules/serverToolsHub');
+          await serverToolsHub.handleSelectMenu(interaction, client);
+          return;
+        }
+
+        // Games interactive hub action select menu
+        if (customId === 'select_games_action') {
+          const gamesHub = require('../../modules/gamesHub');
+          await gamesHub.handleSelectMenu(interaction, client);
           return;
         }
 
@@ -258,6 +335,27 @@ module.exports = {
         if (customId === 'select_level_channel') {
           const levelingHub = require('../../modules/levelingHub');
           await levelingHub.handleChannelSelect(interaction, client);
+          return;
+        }
+
+        // Birthday channel pickers
+        if (customId.startsWith('select_bday_channel_')) {
+          const birthdayHub = require('../../modules/birthdayHub');
+          await birthdayHub.handleChannelSelect(interaction, client);
+          return;
+        }
+
+        // Ticket channel pickers
+        if (customId.startsWith('select_tickethub_')) {
+          const ticketHub = require('../../modules/ticketHub');
+          await ticketHub.handleChannelSelect(interaction, client);
+          return;
+        }
+
+        // Games channel pickers
+        if (customId.startsWith('select_games_channel_')) {
+          const gamesHub = require('../../modules/gamesHub');
+          await gamesHub.handleChannelSelect(interaction, client);
           return;
         }
       }

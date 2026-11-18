@@ -28,35 +28,35 @@ function buildHelpEmbed(prefix, client) {
   return new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
     .setTitle('⚡ AURA Command Menu')
-    .setDescription(`All commands are short and fast to use with **\`${prefix}\`** or **Slash commands** (\`/\`).`)
+    .setDescription(
+      `All features in AURA are simplified into **All-in-One Interactive Guidance Hubs**.\n` +
+      `Simply type the hub command (or click buttons/dropdowns in chat) to manage everything!\n` +
+      `*Administrator options and buttons are strictly filtered and only visible to staff.*`
+    )
     .addFields(
       {
-        name: '🎂 Birthdays (Auto-Delete & DM Confirmation)',
-        value: `\`${prefix}bday <DD/MM/YYYY>\` • \`${prefix}bday setuser @user <DD/MM/YYYY> [tz]\` • \`${prefix}bday view [@user]\` • \`${prefix}bday list\` • \`${prefix}bday setup <#wish> [#set]\`\n*Supports saving birthdays for yourself or others with timezones! In the input channel, typing \`DD/MM/YYYY\` auto-deletes for privacy.*`
+        name: '🏆 Leveling & XP Hub (`/levels` • `+level`)',
+        value: `\`${prefix}levels\` • \`${prefix}rank [@user]\` • \`${prefix}top\` • \`${prefix}addxp @user <n>\` • \`${prefix}resetxp @user\`\n*Interactive hub: view rank card, server leaderboard, role rewards, configure XP rates & announcement channel.*`
       },
       {
-        name: '🔊 Voice Lounges & Voice Actions (Bounce, Move, DC, Mute)',
-        value: `\`${prefix}vc setup\` • \`${prefix}bounce @user\` • \`${prefix}massmove <#to>\` • \`${prefix}massdc [#chan]\` • \`${prefix}massmute [#chan]\` • \`${prefix}massunmute [#chan]\` • \`${prefix}vc panel\`\n*Use \`${prefix}bounce @user\` to move a member across all voice channels one by one in seconds!*`
+        name: '🎂 Birthdays Hub (`/bday` • `+bday`)',
+        value: `\`${prefix}bday\` • \`${prefix}bday <DD/MM/YYYY>\` • \`${prefix}bday view [@user]\` • \`${prefix}bday list\` • \`${prefix}bday setup\`\n*Interactive hub: register birthday modal, upcoming countdowns, auto-delete input channel for privacy, and midnight celebration role.*`
       },
       {
-        name: '📊 XP & Leveling',
-        value: `\`${prefix}rank [@user]\` • \`${prefix}top\` • \`${prefix}reward [add/remove]\` • \`${prefix}addxp @user <n>\` • \`${prefix}resetxp @user\` • \`${prefix}levels\``
+        name: '🔊 Voice & Lounges Hub (`/vc` • `+vc`)',
+        value: `\`${prefix}vc\` • \`${prefix}bounce @user\` • \`${prefix}massmove <#to>\` • \`${prefix}massdc [#chan]\` • \`${prefix}massmute [#chan]\` • \`${prefix}vc panel\`\n*Interactive hub: 1-click Join-to-Create setup, lounge controls (lock, unlock, hide, show, limit, rename), mass move, mass disconnect, and voice bounce!*`
       },
       {
-        name: '🎫 Support & Tickets',
-        value: `\`${prefix}ticket panel\` • \`${prefix}ticket setup <cat> <role>\` • \`${prefix}close\` • \`${prefix}claim\``
+        name: '🎫 Support & Tickets Hub (`/ticket` • `+ticket`)',
+        value: `\`${prefix}ticket\` • \`${prefix}ticket panel\` • \`${prefix}ticket setup <cat> <role>\` • \`${prefix}close\` • \`${prefix}claim\`\n*Interactive hub: open tickets with 1 click, view active tickets, claim, close, deploy public panel, and setup category.*`
       },
       {
-        name: '📌 Sticky Messages & Image Threads',
-        value: `\`${prefix}sticky <text>\` • \`${prefix}sticky list\` • \`${prefix}sticky remove\` • \`${prefix}thread setup <#chan>\``
+        name: '🛠️ Server Tools & Growth Hub (`/servertools` • `+tools`)',
+        value: `\`${prefix}tools\` • \`${prefix}servertag [set|on|off|sync]\` • \`${prefix}counter setup\` • \`${prefix}inv top\` • \`${prefix}inviterole set @role\`\n*Interactive hub: Server Tag auto-role status & sync, voice member counters, invite logs, and inviter role guard.*`
       },
       {
-        name: '📈 Server Counters & Invite Tracker',
-        value: `\`${prefix}inv [@user]\` • \`${prefix}inv top\` • \`${prefix}inv setup <#chan> [#app-log]\` • \`${prefix}inv prelog [on|off]\` • \`${prefix}counter setup\`\n*Tracks joins/leaves, top inviters, and logs who invited applicants before they accept the server application!*`
-      },
-      {
-        name: '🎮 Games & Bumping',
-        value: `\`${prefix}rps [@user]\` • \`${prefix}trivia\` • \`${prefix}count [setup #chan]\` • \`${prefix}chain [setup #chan]\` • \`${prefix}bump [done|setup]\``
+        name: '🎮 Community Minigames Hub (`/games` • `+games`)',
+        value: `\`${prefix}games\` • \`${prefix}rps [@user]\` • \`${prefix}trivia\` • \`${prefix}count [setup #chan]\` • \`${prefix}chain [setup #chan]\` • \`${prefix}bump [done|setup]\`\n*Interactive hub: Play RPS, timed Trivia questions, Counting game status, and Word Chain streak tracking.*`
       },
       {
         name: '✨ Emoji Stealer & Curated Packs (Mass & Selective Add)',
@@ -67,7 +67,7 @@ function buildHelpEmbed(prefix, client) {
         value: `\`${prefix}purge\` *(reply to a message to purge everything after it)* • \`${prefix}purge include\` • \`${prefix}purge <amount> [@user|bots]\` • \`${prefix}clear\`\n*Quickly clean up chat: reply to any message with \`${prefix}purge\` and AURA deletes all messages sent after it!*`
       },
       {
-        name: '⚙️ Modular Feature Controls (Turn Features ON/OFF)',
+        name: '⚙️ Modular Feature Controls (`/modules` • `+modules`)',
         value: `\`${prefix}modules\` • \`${prefix}modules on <feature|all>\` • \`${prefix}modules off <feature|all>\` • \`${prefix}modules toggle <feature>\`\n*Interactively enable or disable any bot feature selectively with dropdown menus & buttons!*`
       },
       {
@@ -75,16 +75,12 @@ function buildHelpEmbed(prefix, client) {
         value: `\`${prefix}trusted set @user\` • \`${prefix}trusted remove @user\` • \`${prefix}trusted list\` • \`${prefix}trusted clear\`\n*Set trusted members who are completely free from all disruptive actions (\`/bounce\`, \`/autodlt\`, \`/vc mute\`) AND can use all bot commands without being an admin or owner! (Server Owner & Bot Dev only)*`
       },
       {
-        name: '🔒 Inviter Role Guard (Exclusive Invite Generation)',
-        value: `\`${prefix}inviterole set @role\` • \`${prefix}inviterole view\` • \`${prefix}inviterole sync\` • \`${prefix}inviterole clean\` • \`${prefix}inviterole disable\`\n*Locks invite creation exclusively to the designated role! Denies @everyone from creating invites, intercepts and deletes unauthorized invite links instantly, and blocks chat invite links.*`
+        name: '📌 Sticky Messages & Image Threads',
+        value: `\`${prefix}sticky <text>\` • \`${prefix}sticky list\` • \`${prefix}sticky remove\` • \`${prefix}thread setup <#chan>\``
       },
       {
         name: '⚡ Auto-Delete Within 1s (/autodlt)',
         value: `\`/autodlt target:@user duration:<time>\` • \`${prefix}autodlt @user <duration>\` • \`${prefix}autodlt stop @user\` • \`${prefix}autodlt list\`\n*Allows target user to send messages, but automatically deletes every message they send within a second for the specified duration (e.g. 30s, 5m, 1h)!*`
-      },
-      {
-        name: '🏷️ Server Tag Auto Role (/servertag)',
-        value: `\`/servertag set role:@role\` • \`/servertag on\` • \`/servertag off\` • \`/servertag status\` • \`/servertag sync\`\n*Prefix: \`${prefix}servertag set @role\` • \`${prefix}servertag off\` • \`${prefix}servertag on\` — Automatically assigns/removes your chosen role using Discord's official Server Tag identity!*`
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })

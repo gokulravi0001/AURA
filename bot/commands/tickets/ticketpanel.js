@@ -7,6 +7,7 @@ const {
 const ticketManager = require('../../modules/ticketManager');
 const Ticket = require('../../../models/Ticket');
 const Guild = require('../../../models/Guild');
+const ticketHub = require('../../modules/ticketHub');
 const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
@@ -14,6 +15,10 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('ticket')
     .setDescription('Create ticket panels, manage support tickets, or configure settings')
+    .addSubcommand(sub =>
+      sub.setName('hub')
+        .setDescription('Open the interactive Support & Ticket guidance and configuration hub')
+    )
     .addSubcommand(sub =>
       sub.setName('panel')
         .setDescription('Create and post a support ticket panel with interactive button (Admin only)')
@@ -61,6 +66,16 @@ module.exports = {
 
   async execute(interaction, client) {
     const sub = interaction.options.getSubcommand();
+
+    // HUB
+    if (sub === 'hub') {
+      const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
+      const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+      const currentTicket = await Ticket.findOne({ channelId: interaction.channel.id }).catch(() => null);
+      const embed = await ticketHub.buildHubEmbed(interaction.guild, guildDoc, interaction.user, isAdmin, interaction.channel);
+      const components = ticketHub.buildHubComponents(interaction.user, isAdmin, guildDoc, currentTicket);
+      return interaction.reply({ embeds: [embed], components, ephemeral: true });
+    }
 
     // 1. PANEL
     if (sub === 'panel') {
@@ -148,6 +163,16 @@ module.exports = {
 
   async executePrefix(message, args, client) {
     const action = args[0]?.toLowerCase();
+
+    // +ticket (no args) or +ticket hub
+    if (!action || action === 'hub' || action === 'menu') {
+      const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
+      const guildDoc = await Guild.findOne({ guildId: message.guild.id });
+      const currentTicket = await Ticket.findOne({ channelId: message.channel.id }).catch(() => null);
+      const embed = await ticketHub.buildHubEmbed(message.guild, guildDoc, message.author, isAdmin, message.channel);
+      const components = ticketHub.buildHubComponents(message.author, isAdmin, guildDoc, currentTicket);
+      return message.reply({ embeds: [embed], components });
+    }
 
     // +close or +ticket close
     if (action === 'close' || message.content.startsWith('+close')) {

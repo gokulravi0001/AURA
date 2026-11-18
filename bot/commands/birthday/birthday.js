@@ -11,6 +11,7 @@ const {
 const Birthday = require('../../../models/Birthday');
 const Guild = require('../../../models/Guild');
 const birthdayService = require('../../modules/birthdayService');
+const birthdayHub = require('../../modules/birthdayHub');
 const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
@@ -18,6 +19,10 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('bday')
     .setDescription('Register, view, list, or configure birthdays')
+    .addSubcommand(sub =>
+      sub.setName('hub')
+        .setDescription('Open the interactive Birthday guidance & configuration hub')
+    )
     .addSubcommand(sub =>
       sub.setName('set')
         .setDescription('Save your birthday or another member\'s birthday with country/timezone')
@@ -61,6 +66,15 @@ module.exports = {
 
   async execute(interaction, client, settings) {
     const sub = interaction.options.getSubcommand();
+
+    // HUB
+    if (sub === 'hub') {
+      const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
+      const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
+      const embed = await birthdayHub.buildHubEmbed(interaction.guild, guildDoc, interaction.user, isAdmin);
+      const components = birthdayHub.buildHubComponents(isAdmin, guildDoc);
+      return interaction.reply({ embeds: [embed], components, ephemeral: true });
+    }
 
     // 1. SET
     if (sub === 'set') {
@@ -230,6 +244,15 @@ module.exports = {
 
   async executePrefix(message, args, client, settings) {
     const action = args[0]?.toLowerCase();
+
+    // +bday (no args) or +bday hub
+    if (!action || action === 'hub' || action === 'menu') {
+      const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
+      const guildDoc = await Guild.findOne({ guildId: message.guild.id });
+      const embed = await birthdayHub.buildHubEmbed(message.guild, guildDoc, message.author, isAdmin);
+      const components = birthdayHub.buildHubComponents(isAdmin, guildDoc);
+      return message.reply({ embeds: [embed], components });
+    }
 
     // +bday view [@user]
     if (action === 'view') {
