@@ -5,21 +5,7 @@ const { COLORS } = require('../../../shared/constants');
 const { hasPermissionOrOwner } = require('../../../shared/permissionHelper');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('counter')
-    .setDescription('Automated server stat counters setup & management (Admin only)')
-    .addSubcommand(sub =>
-      sub.setName('setup')
-        .setDescription('Automatically create stats category and locked voice counter channels')
-    )
-    .addSubcommand(sub =>
-      sub.setName('update')
-        .setDescription('Force an immediate update of all server stat counter channels')
-    )
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Delete all voice counter channels and remove category')
-    ),
+  data: null,
   name: 'counter',
   description: 'Manage automated server voice counters',
   aliases: ['counters', 'counters-setup', 'servercounters'],

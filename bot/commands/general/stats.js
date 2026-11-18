@@ -2,9 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('stats')
-    .setDescription('Display detailed server and bot analytics'),
+  data: null,
   name: 'stats',
   description: 'Display detailed server and bot analytics',
   aliases: ['serverstats', 'botstats', 'info'],

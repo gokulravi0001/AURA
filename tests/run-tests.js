@@ -87,7 +87,7 @@ test('Models: Schemas compile without errors', () => {
 });
 
 // 5. Commands Check
-test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, Bump exist', () => {
+test('Commands: 12 Category Hubs and Prefix shortcuts exist and operate cleanly', () => {
   const ping = require('../bot/commands/general/ping');
   const help = require('../bot/commands/general/help');
   const rank = require('../bot/commands/leveling/rank');
@@ -101,20 +101,29 @@ test('Commands: General, Leveling, Voice, Tickets, Moderation, Birthday, Games, 
   const modulesCmd = require('../bot/commands/general/modules');
   const purge = require('../bot/commands/moderation/purge');
   const bounce = require('../bot/commands/voice/bounce');
+  const modCmd = require('../bot/commands/moderation/mod');
+  const systemCmd = require('../bot/commands/general/system');
+  const toolsCmd = require('../bot/commands/general/servertools');
 
-  assert.ok(ping.data && ping.executePrefix);
+  // Category Hubs have slash command data and executePrefix
   assert.ok(help.data && help.executePrefix);
-  assert.ok(rank.data && rank.executePrefix);
   assert.ok(voice.data && voice.executePrefix);
   assert.ok(tickets.data && tickets.executePrefix);
-  assert.ok(sticky.data && sticky.executePrefix);
   assert.ok(birthday.data && birthday.executePrefix);
   assert.ok(games.data && games.executePrefix);
-  assert.ok(bump.data && bump.executePrefix);
-  assert.ok(invites.data && invites.executePrefix);
   assert.ok(modulesCmd.data && modulesCmd.executePrefix);
-  assert.ok(purge.data && purge.executePrefix);
-  assert.ok(bounce.data && bounce.executePrefix);
+  assert.ok(modCmd.data && modCmd.executePrefix);
+  assert.ok(systemCmd.data && systemCmd.executePrefix);
+  assert.ok(toolsCmd.data && toolsCmd.executePrefix);
+
+  // Sub-commands retain prefix execution and fast shortcut aliases
+  assert.ok(ping.executePrefix && ping.name === 'ping');
+  assert.ok(rank.executePrefix && rank.name === 'rank');
+  assert.ok(sticky.executePrefix && sticky.name === 'sticky');
+  assert.ok(bump.executePrefix && bump.name === 'bump');
+  assert.ok(invites.executePrefix && invites.name === 'invites');
+  assert.ok(purge.executePrefix && purge.name === 'purge');
+  assert.ok(bounce.executePrefix && bounce.name === 'bounce');
 });
 
 // 6. Sticky & Birthday Channel Separation Check
@@ -295,14 +304,11 @@ test('Features: Voice Controls & Mass Actions (Move, DC, Mute, Unmute) Command',
   const countOpt = bounceSub.options.find(opt => opt.name === 'count');
   assert.ok(countOpt && countOpt.min_value === 1 && countOpt.max_value === 100);
 
-  // Top-level bounce command check
+  // Top-level bounce command check (Prefix shortcut & VC hub integration)
   const bounceCmd = require('../bot/commands/voice/bounce');
-  const bounceJson = bounceCmd.data.toJSON();
-  assert.strictEqual(bounceJson.name, 'bounce');
-  const topRounds = bounceJson.options.find(o => o.name === 'rounds');
-  assert.ok(topRounds && topRounds.min_value === 1 && topRounds.max_value === 100);
-  const topCount = bounceJson.options.find(o => o.name === 'count');
-  assert.ok(topCount && topCount.min_value === 1 && topCount.max_value === 100);
+  assert.strictEqual(bounceCmd.name, 'bounce');
+  assert.ok(typeof bounceCmd.executePrefix === 'function');
+  assert.ok(bounceCmd.aliases.includes('vcbounce'));
 
   // Bounce Manager parsing tests
   const bounceManager = require('../bot/modules/bounceManager');
@@ -372,20 +378,8 @@ test('Features: Purge Command & Reply-to-Purge Verification', () => {
   assert.ok(purgeCmd.aliases.includes('clean'));
   assert.ok(purgeCmd.aliases.includes('prune'));
 
-  const json = purgeCmd.data.toJSON();
-  assert.strictEqual(json.name, 'purge');
-
-  const afterSub = json.options.find(o => o.name === 'after');
-  assert.ok(afterSub, 'Subcommand "after" should exist');
-  assert.strictEqual(afterSub.type, 1);
-  const msgIdOpt = afterSub.options.find(o => o.name === 'message_id');
-  assert.ok(msgIdOpt && msgIdOpt.required === true);
-
-  const msgsSub = json.options.find(o => o.name === 'messages');
-  assert.ok(msgsSub, 'Subcommand "messages" should exist');
-  assert.strictEqual(msgsSub.type, 1);
-  const amtOpt = msgsSub.options.find(o => o.name === 'amount');
-  assert.ok(amtOpt && amtOpt.required === true);
+  assert.strictEqual(purgeCmd.name, 'purge');
+  assert.ok(typeof purgeCmd.executePrefix === 'function');
 });
 
 // 15. Bot Developer Global Permission Bypass Verification
@@ -530,11 +524,7 @@ test('Features: Auto-Delete & Shadow-Mute System (/autodlt)', async () => {
   assert.ok(autodltCmd.aliases.includes('autodelete'));
   assert.ok(autodltCmd.aliases.includes('shadowmute'));
   assert.ok(autodltCmd.aliases.includes('shred'));
-  const json = autodltCmd.data.toJSON();
-  assert.strictEqual(json.name, 'autodlt');
-  assert.ok(json.options.find(o => o.name === 'target'));
-  assert.ok(json.options.find(o => o.name === 'duration'));
-  assert.ok(json.options.find(o => o.name === 'channel'));
+  assert.ok(typeof autodltCmd.executePrefix === 'function');
 
   // Verify parseDuration
   const p30s = autoDeleteService.parseDuration('30s');
@@ -993,7 +983,8 @@ function createServerTagTestContext(options = {}) {
     assert.strictEqual(modulesCmd.MODULE_ALIASES['servertag'], 'server_tag_role');
 
     const serverTagCmd = require('../bot/commands/moderation/servertag');
-    assert.strictEqual(serverTagCmd.data.name, 'servertag');
+    assert.strictEqual(serverTagCmd.name, 'servertag');
+    assert.ok(typeof serverTagCmd.executePrefix === 'function');
 
     const ctx = createServerTagTestContext();
     ctx.settings.serverTagRole.enabled = false;
@@ -1190,10 +1181,8 @@ function createServerTagTestContext(options = {}) {
     assert.ok(addemjCmd.aliases.includes('emj'));
     assert.ok(addemjCmd.aliases.includes('stealall'));
     assert.ok(addemjCmd.aliases.includes('addemojis'));
-    const json = addemjCmd.data.toJSON();
-    assert.strictEqual(json.name, 'addemj');
-    assert.ok(json.options.find(o => o.name === 'message_id'));
-    assert.ok(json.options.find(o => o.name === 'emojis'));
+    assert.strictEqual(addemjCmd.name, 'addemj');
+    assert.ok(typeof addemjCmd.executePrefix === 'function');
 
     // 2. Setup mock guild & channel with message history
     const createdEmojis = [];
@@ -1802,6 +1791,37 @@ function createServerTagTestContext(options = {}) {
     SystemConfig.updateOne = origConfigUpdate;
     Blacklist.findOneAndUpdate = origBlFindOneAndUpdate;
     Blacklist.findOneAndDelete = origBlFindOneAndDelete;
+  });
+
+  // 35. Moderation Hub & Clean System Diagnostics
+  await test('Interactive Moderation Hub & System Diagnostics Hub (/mod & /system)', async () => {
+    const moderationHub = require('../bot/modules/moderationHub');
+    const modCmd = require('../bot/commands/moderation/mod');
+    const systemCmd = require('../bot/commands/general/system');
+
+    assert.strictEqual(modCmd.data.name, 'mod');
+    assert.strictEqual(systemCmd.data.name, 'system');
+
+    const mockGuild = { id: 'g_hub_test', name: 'Hub Test Guild' };
+    const mockUser = { id: 'u_1', username: 'MemberOne' };
+    const mockDoc = {
+      autoDelete: { enabled: true, targets: [{ userId: 'target_1', channelId: null, expiresAt: new Date(Date.now() + 60000) }] },
+      stickyMessages: [{ channelId: 'c_1', title: 'Rules', text: 'Be kind' }]
+    };
+
+    // Embed validation
+    const embedAdmin = await moderationHub.buildHubEmbed(mockGuild, mockDoc, mockUser, true);
+    assert.ok(embedAdmin.data.title.includes('Moderation & Chat Protection Hub'));
+    assert.ok(embedAdmin.data.fields.some(f => f.name.includes('Purge & Chat Cleaning')));
+    assert.ok(embedAdmin.data.fields.some(f => f.name.includes('1-Second Auto-Delete')));
+
+    // Component validation: admin vs member
+    const adminComps = moderationHub.buildHubComponents(true);
+    assert.ok(adminComps.length >= 2, 'Admin components should include select menu and action buttons');
+    assert.ok(adminComps[0].components[0].data.options.some(o => o.value === 'mod_purge_prompt'));
+
+    const memberComps = moderationHub.buildHubComponents(false);
+    assert.strictEqual(memberComps.length, 0, 'Non-staff members should see no admin action buttons');
   });
 
   guildService.getSettings = originalGetSettings;

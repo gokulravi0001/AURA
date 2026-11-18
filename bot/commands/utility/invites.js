@@ -11,68 +11,7 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const inviteService = require('../../modules/inviteService');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('invites')
-    .setDescription('View, track, or manage server invites')
-    .addSubcommand(sub =>
-      sub.setName('view')
-        .setDescription('View your or another member\'s invite stats')
-        .addUserOption(opt => opt.setName('user').setDescription('Target member (leave empty to view your own)'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('top')
-        .setDescription('View the top inviters leaderboard for this server')
-    )
-    .addSubcommand(sub =>
-      sub.setName('setup')
-        .setDescription('Set the channel for invite join & leave tracking logs (Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Channel to post invite announcements')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(true)
-        )
-        .addChannelOption(opt =>
-          opt.setName('app_channel')
-            .setDescription('Optional dedicated channel to log who invited applicants before screening')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('prelog')
-        .setDescription('Log who invited members before they accept the server application or rules (Admin only)')
-        .addBooleanOption(opt => opt.setName('enabled').setDescription('Enable or disable pre-application invite logging').setRequired(false))
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Dedicated channel to log who invited applicants before screening')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('add')
-        .setDescription('Add bonus invites to a member (Admin only)')
-        .addUserOption(opt => opt.setName('user').setDescription('Target member').setRequired(true))
-        .addIntegerOption(opt => opt.setName('amount').setDescription('Number of bonus invites to add').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Remove bonus invites from a member (Admin only)')
-        .addUserOption(opt => opt.setName('user').setDescription('Target member').setRequired(true))
-        .addIntegerOption(opt => opt.setName('amount').setDescription('Number of bonus invites to remove').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('reset')
-        .setDescription('Reset all invites for a member (Admin only)')
-        .addUserOption(opt => opt.setName('user').setDescription('Target member').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('guard')
-        .setDescription('Configure exclusive Inviter role requirements (Admin only)')
-        .addRoleOption(opt => opt.setName('role').setDescription('Role required to create and share invites').setRequired(false))
-        .addBooleanOption(opt => opt.setName('enabled').setDescription('Enable or disable inviter role guard').setRequired(false))
-    ),
+  data: null,
   name: 'invites',
   description: 'View or manage server invites',
   aliases: ['inv', 'invite'],

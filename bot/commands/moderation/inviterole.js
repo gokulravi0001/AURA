@@ -10,55 +10,7 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const inviteService = require('../../modules/inviteService');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('inviterole')
-    .setDescription('Configure exclusive invite creation and sharing permissions for an Inviter role')
-    .addSubcommand(sub =>
-      sub.setName('set')
-        .setDescription('Set the role required to create and share invite links')
-        .addRoleOption(opt =>
-          opt.setName('role')
-            .setDescription('The role members must have to create invites')
-            .setRequired(true)
-        )
-        .addBooleanOption(opt =>
-          opt.setName('sync_permissions')
-            .setDescription('Automatically deny Create Invite on @everyone and grant to this role (Recommended)')
-            .setRequired(false)
-        )
-        .addBooleanOption(opt =>
-          opt.setName('clean_old_invites')
-            .setDescription('Automatically delete existing invites created by members without this role')
-            .setRequired(false)
-        )
-        .addBooleanOption(opt =>
-          opt.setName('block_chat')
-            .setDescription('Automatically delete Discord invite links sent in chat by unauthorized members')
-            .setRequired(false)
-        )
-        .addChannelOption(opt =>
-          opt.setName('log_channel')
-            .setDescription('Channel to log unauthorized invite generation attempts')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('view')
-        .setDescription('View current Inviter Role guard status and settings')
-    )
-    .addSubcommand(sub =>
-      sub.setName('disable')
-        .setDescription('Disable the Inviter Role guard and restore default invite permissions')
-    )
-    .addSubcommand(sub =>
-      sub.setName('sync')
-        .setDescription('Re-sync Discord permissions: lock @everyone from inviting and grant to Inviter role')
-    )
-    .addSubcommand(sub =>
-      sub.setName('clean')
-        .setDescription('Scan and delete all current invites created by members without the Inviter role')
-    ),
+  data: null,
 
   name: 'inviterole',
   description: 'Manage exclusive inviter role restrictions',

@@ -60,19 +60,7 @@ async function fetchTargetAndMessagesBelow(channel, targetMessageId, stopMessage
 }
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('addemj')
-    .setDescription('Add all emojis from a message and all messages below it directly to your server')
-    .addStringOption(opt =>
-      opt.setName('message_id')
-        .setDescription('The ID of the starting message containing emojis')
-        .setRequired(false)
-    )
-    .addStringOption(opt =>
-      opt.setName('emojis')
-        .setDescription('Paste custom emojis or image URLs directly')
-        .setRequired(false)
-    ),
+  data: null,
 
   name: 'addemj',
   description: 'Reply to an emoji message with +addemj to add it and all emojis below it directly to your server',

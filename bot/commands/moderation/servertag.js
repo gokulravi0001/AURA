@@ -194,40 +194,7 @@ async function handleAction({ guild, caller, client, settings, action, role = nu
 }
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('servertag')
-    .setDescription('Configure automatic role rewards for members wearing this server\'s Discord Server Tag')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .addSubcommand(sub =>
-      sub.setName('set')
-        .setDescription('Set the role to automatically assign/remove when members adopt or drop your server tag')
-        .addRoleOption(opt =>
-          opt.setName('role')
-            .setDescription('Role to grant to members wearing this server tag')
-            .setRequired(true)
-        )
-        .addBooleanOption(opt =>
-          opt.setName('include_bots')
-            .setDescription('Also assign the role to bot accounts (Default: False)')
-            .setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('on')
-        .setDescription('Turn Server Tag Auto Role ON using your saved role')
-    )
-    .addSubcommand(sub =>
-      sub.setName('off')
-        .setDescription('Turn Server Tag Auto Role OFF')
-    )
-    .addSubcommand(sub =>
-      sub.setName('status')
-        .setDescription('View current Server Tag Auto Role status, detected tag, and member count')
-    )
-    .addSubcommand(sub =>
-      sub.setName('sync')
-        .setDescription('Immediately synchronize tag roles across all members')
-    ),
+  data: null,
 
   name: 'servertag',
   description: 'Configure automatic role rewards for Discord Server Tag wearers',

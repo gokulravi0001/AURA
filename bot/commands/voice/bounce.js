@@ -9,38 +9,7 @@ const bounceManager = require('../../modules/bounceManager');
 const immunityService = require('../../../shared/immunityService');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('bounce')
-    .setDescription('Move a member across all voice channels one by one in a few seconds')
-    .addUserOption(opt =>
-      opt.setName('target')
-        .setDescription('The member to tour across all voice channels')
-        .setRequired(true)
-    )
-    .addIntegerOption(opt =>
-      opt.setName('rounds')
-        .setDescription('Number of rounds to tour through all VCs (1-100, default: 1)')
-        .setMinValue(1)
-        .setMaxValue(100)
-        .setRequired(false)
-    )
-    .addIntegerOption(opt =>
-      opt.setName('count')
-        .setDescription('Alias for rounds: number of rounds to tour (1-100, default: 1)')
-        .setMinValue(1)
-        .setMaxValue(100)
-        .setRequired(false)
-    )
-    .addBooleanOption(opt =>
-      opt.setName('return_to_start')
-        .setDescription('Return member to their starting channel when finished (default: true)')
-        .setRequired(false)
-    )
-    .addBooleanOption(opt =>
-      opt.setName('stop')
-        .setDescription('Stop an active voice bounce for this member')
-        .setRequired(false)
-    ),
+  data: null,
 
   name: 'bounce',
   description: 'Move a member across all voice channels one by one in a few seconds',

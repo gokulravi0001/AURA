@@ -29,62 +29,58 @@ function buildHelpEmbed(prefix, client) {
     .setColor(COLORS.PRIMARY)
     .setTitle('⚡ AURA Command Menu')
     .setDescription(
-      `All features in AURA are simplified into **All-in-One Interactive Guidance Hubs**.\n` +
-      `Simply type the hub command (or click buttons/dropdowns in chat) to manage everything!\n` +
+      `All AURA capabilities are organized into **12 All-in-One Interactive Hubs**.\n` +
+      `Type any command below (or use quick prefix shortcuts) to open interactive embeds with dropdowns and buttons!\n` +
       `*Administrator options and buttons are strictly filtered and only visible to staff.*`
     )
     .addFields(
       {
-        name: '🏆 Leveling & XP Hub (`/levels` • `+level`)',
-        value: `\`${prefix}levels\` • \`${prefix}rank [@user]\` • \`${prefix}top\` • \`${prefix}addxp @user <n>\` • \`${prefix}resetxp @user\`\n*Interactive hub: view rank card, server leaderboard, role rewards, configure XP rates & announcement channel.*`
+        name: '🏆 Leveling & XP Hub (`/level` • `+level`)',
+        value: `*Slash:* \`/level\` • *Shortcuts:* \`${prefix}rank\`, \`${prefix}top\`, \`${prefix}addxp\`, \`${prefix}resetxp\`\nInteractive hub: view rank cards, leaderboard, configure level rewards, announcement channel, and XP rates.`
       },
       {
         name: '🎂 Birthdays Hub (`/bday` • `+bday`)',
-        value: `\`${prefix}bday\` • \`${prefix}bday <DD/MM/YYYY>\` • \`${prefix}bday view [@user]\` • \`${prefix}bday list\` • \`${prefix}bday setup\`\n*Interactive hub: register birthday modal, upcoming countdowns, auto-delete input channel for privacy, and midnight celebration role.*`
+        value: `*Slash:* \`/bday\` • *Shortcuts:* \`${prefix}bday set\`, \`${prefix}bday list\`, \`${prefix}bday setup\`\nInteractive hub: register birthdays, upcoming celebrations countdown, privacy input channels, and celebration roles.`
       },
       {
         name: '🔊 Voice & Lounges Hub (`/vc` • `+vc`)',
-        value: `\`${prefix}vc\` • \`${prefix}bounce @user\` • \`${prefix}massmove <#to>\` • \`${prefix}massdc [#chan]\` • \`${prefix}massmute [#chan]\` • \`${prefix}vc panel\`\n*Interactive hub: 1-click Join-to-Create setup, lounge controls (lock, unlock, hide, show, limit, rename), mass move, mass disconnect, and voice bounce!*`
+        value: `*Slash:* \`/vc\` • *Shortcuts:* \`${prefix}bounce\`, \`${prefix}massmove\`, \`${prefix}massdc\`\nInteractive hub: 1-click Join-to-Create setup, lounge controls (lock, unlock, hide, show, limit, rename), and voice bounce.`
       },
       {
         name: '🎫 Support & Tickets Hub (`/ticket` • `+ticket`)',
-        value: `\`${prefix}ticket\` • \`${prefix}ticket panel\` • \`${prefix}ticket setup <cat> <role>\` • \`${prefix}close\` • \`${prefix}claim\`\n*Interactive hub: open tickets with 1 click, view active tickets, claim, close, deploy public panel, and setup category.*`
+        value: `*Slash:* \`/ticket\` • *Shortcuts:* \`${prefix}ticket panel\`, \`${prefix}close\`, \`${prefix}claim\`\nInteractive hub: 1-click ticket panels, ticket manager, transcripts, claim/close workflows, and category settings.`
       },
       {
-        name: '🛠️ Server Tools & Growth Hub (`/servertools` • `+tools`)',
-        value: `\`${prefix}tools\` • \`${prefix}servertag [set|on|off|sync]\` • \`${prefix}counter setup\` • \`${prefix}inv top\` • \`${prefix}inviterole set @role\`\n*Interactive hub: Server Tag auto-role status & sync, voice member counters, invite logs, and inviter role guard.*`
+        name: '🛡️ Moderation & Protection Hub (`/mod` • `+mod`)',
+        value: `*Slash:* \`/mod\` • *Shortcuts:* \`${prefix}purge\`, \`${prefix}autodlt\`, \`${prefix}sticky\`, \`${prefix}thread\`\nInteractive hub: bulk purge (presets or reply), 1s auto-delete duration, sticky messages, and image auto-threads.`
       },
       {
-        name: '🎮 Community Minigames Hub (`/games` • `+games`)',
-        value: `\`${prefix}games\` • \`${prefix}rps [@user]\` • \`${prefix}trivia\` • \`${prefix}count [setup #chan]\` • \`${prefix}chain [setup #chan]\` • \`${prefix}bump [done|setup]\`\n*Interactive hub: Play RPS, timed Trivia questions, Counting game status, and Word Chain streak tracking.*`
+        name: '📈 Server Tools & Growth Hub (`/tools` • `+tools`)',
+        value: `*Slash:* \`/tools\` • *Shortcuts:* \`${prefix}servertag\`, \`${prefix}counter\`, \`${prefix}invites\`, \`${prefix}inviterole\`\nInteractive hub: Discord Server Tag auto-roles & sync, voice member stat counters, invite tracking & inviter role guard.`
       },
       {
-        name: '✨ Emoji Stealer & Curated Packs (Mass & Selective Add)',
-        value: `\`${prefix}addemj\` *(reply to add target emoji & all emojis below it)* • \`${prefix}steal <emojis...>\` • \`${prefix}massadd <emojis...>\` • \`${prefix}emoji packs\` • \`${prefix}emoji list\`\n*Reply to any emoji with \`${prefix}addemj\` to instantly add it and all emojis in messages below it directly to your server! Or use \`${prefix}steal\` for selective dropdown.*`
+        name: '🎮 Minigames & Activities Hub (`/games` • `+games`)',
+        value: `*Slash:* \`/games\` • *Shortcuts:* \`${prefix}rps\`, \`${prefix}trivia\`, \`${prefix}count\`, \`${prefix}chain\`, \`${prefix}bump\`\nInteractive hub: play Rock-Paper-Scissors, timed Trivia, Counting & Word Chain streaks, and bump reminders.`
       },
       {
-        name: '🧹 Chat Moderation & Purge (Reply to Purge)',
-        value: `\`${prefix}purge\` *(reply to a message to purge everything after it)* • \`${prefix}purge include\` • \`${prefix}purge <amount> [@user|bots]\` • \`${prefix}clear\`\n*Quickly clean up chat: reply to any message with \`${prefix}purge\` and AURA deletes all messages sent after it!*`
+        name: '✨ Emoji Stealer & Packs Hub (`/emoji` • `+emoji`)',
+        value: `*Slash:* \`/emoji\` • *Shortcuts:* \`${prefix}addemj\` *(reply to steal emojis)*, \`${prefix}steal\`, \`${prefix}massadd\`\nInteractive hub: Mass steal emojis from replies/messages, selective emoji picker, and curated aesthetic emoji packs.`
       },
       {
         name: '⚙️ Modular Feature Controls (`/modules` • `+modules`)',
-        value: `\`${prefix}modules\` • \`${prefix}modules on <feature|all>\` • \`${prefix}modules off <feature|all>\` • \`${prefix}modules toggle <feature>\`\n*Interactively enable or disable any bot feature selectively with dropdown menus & buttons!*`
+        value: `*Slash:* \`/modules\` • *Shortcuts:* \`${prefix}modules\`, \`${prefix}modules toggle <name>\`\nInteractive hub: selectively toggle any bot module on or off with interactive dropdown menus and buttons.`
       },
       {
-        name: '⭐ Trusted Members (Full Immunity & Command Access)',
-        value: `\`${prefix}trusted set @user\` • \`${prefix}trusted remove @user\` • \`${prefix}trusted list\` • \`${prefix}trusted clear\`\n*Set trusted members who are completely free from all disruptive actions (\`/bounce\`, \`/autodlt\`, \`/vc mute\`) AND can use all bot commands without being an admin or owner! (Server Owner & Bot Dev only)*`
+        name: '⭐ Trusted Members Management (`/trusted` • `+trusted`)',
+        value: `*Slash:* \`/trusted\` • *Shortcuts:* \`${prefix}trusted set @user\`, \`${prefix}trusted list\`\nInteractive hub: grant full immunity from disruptive commands and full command access without needing admin permissions.`
       },
       {
-        name: '📌 Sticky Messages & Image Threads',
-        value: `\`${prefix}sticky <text>\` • \`${prefix}sticky list\` • \`${prefix}sticky remove\` • \`${prefix}thread setup <#chan>\``
+        name: '👑 System Diagnostics & Controls (`/system` • `+system`)',
+        value: `*Slash:* \`/system\` • *Shortcuts:* \`${prefix}ping\`, \`${prefix}stats\`, \`${prefix}maintenance\`, \`${prefix}blacklist\`\nInteractive hub: WebSocket ping, database health, memory heap, developer maintenance mode, and blacklist management.`
       },
       {
-        name: '⚡ Auto-Delete Within 1s (/autodlt)',
-        value: `\`/autodlt target:@user duration:<time>\` • \`${prefix}autodlt @user <duration>\` • \`${prefix}autodlt stop @user\` • \`${prefix}autodlt list\`\n*Allows target user to send messages, but automatically deletes every message they send within a second for the specified duration (e.g. 30s, 5m, 1h)!*`
-      },
-      {
-        name: '👑 Developer Core Controls (Developer Only)',
-        value: `\`${prefix}maintenance [on|off|status]\` • \`${prefix}blacklist [add|remove|list]\`\n*Control global maintenance mode and ban abusive users or servers across all AURA interactions!*`
+        name: '⚡ Master Help Guide (`/help` • `+help`)',
+        value: `*Slash:* \`/help\` • *Shortcuts:* \`${prefix}help\`, \`${prefix}commands\`\nDisplays this comprehensive command menu and guidance hub overview.`
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })

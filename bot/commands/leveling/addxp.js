@@ -4,11 +4,7 @@ const levelingService = require('../../modules/levelingService');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('addxp')
-    .setDescription('Add XP to a server member (Admin only)')
-    .addUserOption(opt => opt.setName('user').setDescription('The target user').setRequired(true))
-    .addIntegerOption(opt => opt.setName('amount').setDescription('Amount of XP to add').setRequired(true)),
+  data: null,
   name: 'addxp',
   description: 'Add XP to a member',
   permissions: [PermissionFlagsBits.Administrator],

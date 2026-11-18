@@ -4,24 +4,7 @@ const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('reward')
-    .setDescription('View or manage leveling role rewards')
-    .addSubcommand(sub =>
-      sub.setName('view')
-        .setDescription('View all level role rewards configured for this server')
-    )
-    .addSubcommand(sub =>
-      sub.setName('add')
-        .setDescription('Add a new role reward for reaching a level (Admin only)')
-        .addIntegerOption(opt => opt.setName('level').setDescription('Level requirement').setRequired(true))
-        .addRoleOption(opt => opt.setName('role').setDescription('Role to award').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Remove a role reward for a level (Admin only)')
-        .addIntegerOption(opt => opt.setName('level').setDescription('Level requirement to remove').setRequired(true))
-    ),
+  data: null,
   name: 'reward',
   description: 'View or manage leveling role rewards',
   aliases: ['rewards', 'rolerewards', 'levelrewards'],

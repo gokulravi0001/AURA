@@ -11,25 +11,7 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('autodlt')
-    .setDescription('Automatically delete messages from a target user within a second for a set duration')
-    .addUserOption(opt =>
-      opt.setName('target')
-        .setDescription('The member whose messages will be automatically deleted within a second')
-        .setRequired(true)
-    )
-    .addStringOption(opt =>
-      opt.setName('duration')
-        .setDescription('How long autodlt happens (e.g. 30s, 5m, 10m, 1h, 1d, or "stop" to cancel)')
-        .setRequired(true)
-    )
-    .addChannelOption(opt =>
-      opt.setName('channel')
-        .setDescription('Limit autodlt to a specific channel (leave empty for entire server)')
-        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice)
-        .setRequired(false)
-    ),
+  data: null,
 
   name: 'autodlt',
   description: 'Automatically delete messages from a target user within a second for a set duration',

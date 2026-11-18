@@ -3,9 +3,7 @@ const UserXP = require('../../../models/UserXP');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('top')
-    .setDescription('View the top 10 ranked members on this server'),
+  data: null,
   name: 'top',
   description: 'View the top 10 ranked members on this server',
   aliases: ['lb', 'leaderboard'],

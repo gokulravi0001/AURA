@@ -4,10 +4,7 @@ const levelingService = require('../../modules/levelingService');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('rank')
-    .setDescription('Check your or another member\'s XP, level, and server rank')
-    .addUserOption(opt => opt.setName('user').setDescription('The user whose rank you want to view')),
+  data: null,
   name: 'rank',
   description: 'Check your or another member\'s XP, level, and server rank',
   aliases: ['rankcard', 'myrank'],

@@ -5,33 +5,7 @@ const { isBotOwner } = require('../../../shared/permissionHelper');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('blacklist')
-    .setDescription('Manage user and server blacklists (Developer only)')
-    .addSubcommand(sub =>
-      sub.setName('add')
-        .setDescription('Blacklist a user or server from using AURA')
-        .addStringOption(opt =>
-          opt.setName('type')
-            .setDescription('Type of entity to blacklist')
-            .setRequired(true)
-            .addChoices(
-              { name: 'User', value: 'user' },
-              { name: 'Server / Guild', value: 'guild' }
-            )
-        )
-        .addStringOption(opt => opt.setName('target_id').setDescription('Discord ID of user or server').setRequired(true))
-        .addStringOption(opt => opt.setName('reason').setDescription('Reason for blacklist'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Remove a user or server from the blacklist')
-        .addStringOption(opt => opt.setName('target_id').setDescription('Discord ID of user or server').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('list')
-        .setDescription('List all blacklisted users and servers')
-    ),
+  data: null,
   name: 'blacklist',
   description: 'Manage user and server blacklists',
   aliases: ['bl'],

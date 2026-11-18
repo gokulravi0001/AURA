@@ -5,11 +5,7 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const immunityService = require('../../../shared/immunityService');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('resetxp')
-    .setDescription('Reset XP for a specific member or all server members (Admin only)')
-    .addUserOption(opt => opt.setName('user').setDescription('Target member to reset (leave empty for server reset)').setRequired(false))
-    .addBooleanOption(opt => opt.setName('server').setDescription('Set to true to reset the entire server').setRequired(false)),
+  data: null,
   name: 'resetxp',
   description: 'Reset XP for a member or entire server',
   permissions: [PermissionFlagsBits.Administrator],

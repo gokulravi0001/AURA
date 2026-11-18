@@ -3,28 +3,7 @@ const Guild = require('../../../models/Guild');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('thread')
-    .setDescription('Configure automatic discussion threads for image posts (Admin only)')
-    .addSubcommand(sub =>
-      sub.setName('setup')
-        .setDescription('Set the channel monitored for image thread creation')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Channel to monitor for image posts')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(true)
-        )
-        .addStringOption(opt => opt.setName('format').setDescription('Thread name format (e.g. 💬 Discussion - {author})'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('status')
-        .setDescription('View current image threads configuration')
-    )
-    .addSubcommand(sub =>
-      sub.setName('off')
-        .setDescription('Disable automatic image threads')
-    ),
+  data: null,
   name: 'thread',
   description: 'Manage auto image threads',
   aliases: ['threads', 'imagethreads'],

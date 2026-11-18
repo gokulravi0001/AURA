@@ -145,6 +145,13 @@ module.exports = {
           return;
         }
 
+        // Moderation interactive hub buttons: btn_mod_
+        if (customId.startsWith('btn_mod_')) {
+          const moderationHub = require('../../modules/moderationHub');
+          await moderationHub.handleButton(interaction, client);
+          return;
+        }
+
         // Server tools interactive hub buttons: btn_tools_
         if (customId.startsWith('btn_tools_')) {
           const serverToolsHub = require('../../modules/serverToolsHub');
@@ -275,6 +282,13 @@ module.exports = {
           return;
         }
 
+        // Moderation interactive hub modals: modal_mod_
+        if (customId.startsWith('modal_mod_')) {
+          const moderationHub = require('../../modules/moderationHub');
+          await moderationHub.handleModal(interaction, client);
+          return;
+        }
+
         const handler = client.modals.get(customId);
         if (handler) {
           await handler(interaction, client);
@@ -310,6 +324,13 @@ module.exports = {
         if (customId === 'select_tickethub_action') {
           const ticketHub = require('../../modules/ticketHub');
           await ticketHub.handleSelectMenu(interaction, client);
+          return;
+        }
+
+        // Moderation interactive hub action select menu
+        if (customId === 'select_mod_action') {
+          const moderationHub = require('../../modules/moderationHub');
+          await moderationHub.handleSelectMenu(interaction, client);
           return;
         }
 
@@ -392,6 +413,13 @@ module.exports = {
         if (customId.startsWith('select_games_channel_')) {
           const gamesHub = require('../../modules/gamesHub');
           await gamesHub.handleChannelSelect(interaction, client);
+          return;
+        }
+
+        // Moderation channel pickers
+        if (customId.startsWith('select_mod_channel_')) {
+          const moderationHub = require('../../modules/moderationHub');
+          await moderationHub.handleChannelSelect(interaction, client);
           return;
         }
       }

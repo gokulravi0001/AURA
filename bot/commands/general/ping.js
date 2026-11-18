@@ -10,9 +10,7 @@ function getPingMetrics(client) {
 }
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('ping')
-    .setDescription('Check AURA bot latency and Discord API response time'),
+  data: null,
   name: 'ping',
   description: 'Check AURA bot latency and Discord API response time',
   aliases: ['latency', 'p'],

@@ -4,25 +4,7 @@ const stickyService = require('../../modules/stickyService');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('sticky')
-    .setDescription('Manage sticky messages for channels (Admin / Mod only)')
-    .addSubcommand(sub =>
-      sub.setName('set')
-        .setDescription('Set or update a sticky message in this or a designated channel')
-        .addStringOption(opt => opt.setName('text').setDescription('The message content').setRequired(true))
-        .addStringOption(opt => opt.setName('title').setDescription('Optional embed title'))
-        .addChannelOption(opt => opt.setName('channel').setDescription('Channel to attach sticky (defaults to current)').addChannelTypes(ChannelType.GuildText))
-    )
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Remove the sticky message from this or a designated channel')
-        .addChannelOption(opt => opt.setName('channel').setDescription('Channel to remove sticky from').addChannelTypes(ChannelType.GuildText))
-    )
-    .addSubcommand(sub =>
-      sub.setName('list')
-        .setDescription('List all channels with active sticky messages on this server')
-    ),
+  data: null,
   name: 'sticky',
   description: 'Manage sticky messages',
   permissions: [PermissionFlagsBits.ManageMessages],

@@ -9,49 +9,7 @@ const { hasPermissionOrOwner } = require('../../../shared/permissionHelper');
 const immunityService = require('../../../shared/immunityService');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('purge')
-    .setDescription('Bulk delete messages or clean up spam bot aftermath')
-    .addSubcommand(sub =>
-      sub.setName('after')
-        .setDescription('Delete all messages sent after (and including) a specific message ID')
-        .addStringOption(opt =>
-          opt.setName('message_id')
-            .setDescription('The ID of the message to purge from')
-            .setRequired(true)
-        )
-        .addBooleanOption(opt =>
-          opt.setName('include_message')
-            .setDescription('Also delete the specified message itself (default: true)')
-            .setRequired(false)
-        )
-        .addBooleanOption(opt =>
-          opt.setName('bots_only')
-            .setDescription('Only delete bot & webhook messages in that range (default: false)')
-            .setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('messages')
-        .setDescription('Delete a specific number of recent messages')
-        .addIntegerOption(opt =>
-          opt.setName('amount')
-            .setDescription('Number of messages to delete (1-100)')
-            .setMinValue(1)
-            .setMaxValue(100)
-            .setRequired(true)
-        )
-        .addUserOption(opt =>
-          opt.setName('user')
-            .setDescription('Only delete messages from this specific user')
-            .setRequired(false)
-        )
-        .addBooleanOption(opt =>
-          opt.setName('bots_only')
-            .setDescription('Only delete messages sent by bots')
-            .setRequired(false)
-        )
-    ),
+  data: null,
 
   name: 'purge',
   description: 'Delete messages or clean up spam bot messages after a replied message',

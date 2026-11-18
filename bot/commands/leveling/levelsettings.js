@@ -6,7 +6,7 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('levels')
+    .setName('level')
     .setDescription('Interactive Leveling & XP Hub (Rank, Leaderboard, Rewards, Settings)')
     .addSubcommand(sub =>
       sub.setName('hub')

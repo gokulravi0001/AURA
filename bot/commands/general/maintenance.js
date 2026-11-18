@@ -5,22 +5,7 @@ const { isBotOwner } = require('../../../shared/permissionHelper');
 const { COLORS } = require('../../../shared/constants');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('maintenance')
-    .setDescription('Manage AURA system maintenance mode (Developer only)')
-    .addSubcommand(sub =>
-      sub.setName('status')
-        .setDescription('View current system maintenance mode status')
-    )
-    .addSubcommand(sub =>
-      sub.setName('on')
-        .setDescription('Enable system maintenance mode')
-        .addStringOption(opt => opt.setName('message').setDescription('Custom maintenance message displayed to users'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('off')
-        .setDescription('Disable system maintenance mode')
-    ),
+  data: null,
   name: 'maintenance',
   description: 'Manage AURA system maintenance mode',
   aliases: ['maint'],

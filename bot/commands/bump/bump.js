@@ -5,29 +5,7 @@ const { COLORS } = require('../../../shared/constants');
 const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('bump')
-    .setDescription('View bump timer, register a bump, or configure bump reminders')
-    .addSubcommand(sub =>
-      sub.setName('status')
-        .setDescription('Check when the next bump is due')
-    )
-    .addSubcommand(sub =>
-      sub.setName('done')
-        .setDescription('Mark the server as bumped right now and start the reminder countdown')
-    )
-    .addSubcommand(sub =>
-      sub.setName('setup')
-        .setDescription('Configure bump reminder channel, role, and interval (Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Channel where bump reminders are sent')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(true)
-        )
-        .addRoleOption(opt => opt.setName('role').setDescription('Role to ping when a bump is due'))
-        .addIntegerOption(opt => opt.setName('interval').setDescription('Reminder interval in minutes (default 120 for Disboard)'))
-    ),
+  data: null,
   name: 'bump',
   description: 'View or configure bump reminders',
   aliases: ['bumpstatus', 'bump-status'],

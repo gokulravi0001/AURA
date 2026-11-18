@@ -5,11 +5,11 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('servertools')
-    .setDescription('Interactive Server Management & Growth Hub (Tag role, counters, invite logs)'),
-  name: 'servertools',
-  description: 'Interactive Server Management & Growth Hub',
-  aliases: ['tools', 'growth', 'growthhub'],
+    .setName('tools')
+    .setDescription('Interactive Server Growth & Tools Hub (Server Tag, Counters, Invites)'),
+  name: 'tools',
+  description: 'Interactive Server Growth & Tools Hub',
+  aliases: ['servertools', 'growth', 'growthhub', 'servertag', 'counter', 'invites'],
   module: 'server_tools',
 
   async execute(interaction, client) {
