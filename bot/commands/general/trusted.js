@@ -11,32 +11,11 @@ const { COLORS } = require('../../../shared/constants');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('trusted')
-    .setDescription('Configure trusted members who have full immunity and can run all commands without admin')
-    .addSubcommand(sub =>
-      sub.setName('set')
-        .setDescription('Set a member as trusted (grants full immunity & command access without admin/owner)')
-        .addUserOption(opt =>
-          opt.setName('user')
-            .setDescription('The member to set as trusted')
-            .setRequired(true)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Remove trusted status from a member')
-        .addUserOption(opt =>
-          opt.setName('user')
-            .setDescription('The member to remove from trusted list')
-            .setRequired(true)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('list')
-        .setDescription('Display all trusted members and immune roles in this server')
-    )
-    .addSubcommand(sub =>
-      sub.setName('clear')
-        .setDescription('Clear all trusted members in this server')
+    .setDescription('Manage trusted members who have full immunity and command access without admin')
+    .addUserOption(opt =>
+      opt.setName('user')
+        .setDescription('Member to add or remove from trusted list (leave empty to view list)')
+        .setRequired(false)
     ),
 
   name: 'trusted',
@@ -56,7 +35,46 @@ module.exports = {
       });
     }
 
-    const sub = interaction.options.getSubcommand();
+    const sub = interaction.options.getSubcommand(false);
+    const targetUser = interaction.options.getUser('user');
+
+    if (targetUser) {
+      if (targetUser.bot) {
+        return interaction.reply({ content: '❌ Bots cannot be set as trusted members.', ephemeral: true });
+      }
+      if (targetUser.id === immunityService.ABSOLUTE_IMMUNE_USER_ID || isBotOwner(targetUser.id, client)) {
+        return interaction.reply({ content: `ℹ️ <@${targetUser.id}> is a **Bot Developer / Owner** and already has permanent global immunity and command bypass across all servers.`, ephemeral: true });
+      }
+      if (guild.ownerId === targetUser.id) {
+        return interaction.reply({ content: `ℹ️ <@${targetUser.id}> is the **Server Owner** and already has full immunity and command access.`, ephemeral: true });
+      }
+
+      const isAlreadyTrusted = trustedService.isTrusted(guild.id, targetUser.id);
+      if (isAlreadyTrusted) {
+        await trustedService.removeTrusted(guild.id, targetUser.id);
+        const embed = new EmbedBuilder()
+          .setColor(COLORS.WARNING)
+          .setTitle('🗑️ Trusted Member Removed')
+          .setDescription(`Removed <@${targetUser.id}> from the **Trusted Members** list on this server.`)
+          .setFooter({ text: `Removed by ${interaction.user.tag}` })
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed] });
+      } else {
+        await trustedService.addTrusted(guild.id, targetUser.id);
+        const embed = new EmbedBuilder()
+          .setColor(COLORS.SUCCESS)
+          .setTitle('🛡️ Trusted Member Set')
+          .setDescription(
+            `Successfully added <@${targetUser.id}> as a **Trusted Member**.\n\n` +
+            `✨ **Privileges Granted:**\n` +
+            `• **Absolute Immunity:** Protected from all disruptive bot actions (/bounce, /autodlt, /vc mute, etc.)\n` +
+            `• **Command Access:** Can use all bot commands on this server without needing Discord Administrator or specific permissions!`
+          )
+          .setFooter({ text: `Configured by ${interaction.user.tag}` })
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed] });
+      }
+    }
 
     if (sub === 'set') {
       const targetUser = interaction.options.getUser('user');

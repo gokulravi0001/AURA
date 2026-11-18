@@ -16,126 +16,7 @@ const voiceHub = require('../../modules/voiceHub');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('vc')
-    .setDescription('Manage your temporary voice lounge or setup Join-to-Create')
-    .addSubcommand(sub =>
-      sub.setName('hub')
-        .setDescription('Open the interactive Voice & Lounges guidance and control hub')
-    )
-    .addSubcommand(sub =>
-      sub.setName('setup')
-        .setDescription('Create Join-to-Create trigger channel and category automatically (Admin only)')
-        .addStringOption(opt => opt.setName('format').setDescription('Naming format (e.g. 🔊 {username}\'s Lounge)'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('lock')
-        .setDescription('Lock your voice channel from new members')
-    )
-    .addSubcommand(sub =>
-      sub.setName('unlock')
-        .setDescription('Unlock your voice channel')
-    )
-    .addSubcommand(sub =>
-      sub.setName('hide')
-        .setDescription('Hide your voice channel from @everyone')
-    )
-    .addSubcommand(sub =>
-      sub.setName('show')
-        .setDescription('Make your voice channel visible to @everyone')
-    )
-    .addSubcommand(sub =>
-      sub.setName('limit')
-        .setDescription('Set user limit for your channel')
-        .addIntegerOption(opt => opt.setName('count').setDescription('Max users (0 for unlimited)').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('name')
-        .setDescription('Rename your voice channel')
-        .addStringOption(opt => opt.setName('name').setDescription('New channel name').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('give')
-        .setDescription('Transfer ownership of your channel to another member in the lounge')
-        .addUserOption(opt => opt.setName('target').setDescription('Member to transfer ownership to').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('panel')
-        .setDescription('Send the interactive customization control panel into your voice channel')
-    )
-    .addSubcommand(sub =>
-      sub.setName('move')
-        .setDescription('Mass move all members from one voice channel to another (Owner & Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('to')
-            .setDescription('Destination voice channel')
-            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
-            .setRequired(true)
-        )
-        .addChannelOption(opt =>
-          opt.setName('from')
-            .setDescription('Source voice channel (defaults to your current voice channel)')
-            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('disconnect')
-        .setDescription('Mass disconnect all members from a voice channel (Owner & Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Voice channel to disconnect members from (defaults to your current voice channel)')
-            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('mute')
-        .setDescription('Mass server-mute all members in a voice channel (Owner & Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Voice channel to mute members in (defaults to your current voice channel)')
-            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('unmute')
-        .setDescription('Mass server-unmute all members in a voice channel (Owner & Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Voice channel to unmute members in (defaults to your current voice channel)')
-            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('bounce')
-        .setDescription('Move a member across all voice channels one by one in a few seconds (Owner & Admin only)')
-        .addUserOption(opt =>
-          opt.setName('target')
-            .setDescription('Member to move across voice channels')
-            .setRequired(true)
-        )
-        .addIntegerOption(opt =>
-          opt.setName('rounds')
-            .setDescription('Number of rounds to tour through all VCs (1-100, default: 1)')
-            .setMinValue(1)
-            .setMaxValue(100)
-            .setRequired(false)
-        )
-        .addIntegerOption(opt =>
-          opt.setName('count')
-            .setDescription('Alias for rounds: number of rounds to tour (1-100, default: 1)')
-            .setMinValue(1)
-            .setMaxValue(100)
-            .setRequired(false)
-        )
-        .addBooleanOption(opt =>
-          opt.setName('return_to_start')
-            .setDescription('Return member to their starting channel when finished (default: true)')
-            .setRequired(false)
-        )
-        .addBooleanOption(opt =>
-          opt.setName('stop')
-            .setDescription('Stop an active voice bounce for this member')
-            .setRequired(false)
-        )
-    ),
+    .setDescription('Interactive Voice & Lounges Hub (Join-to-Create, Lounge Controls, Bounce)'),
   name: 'vc',
   description: 'Manage temporary voice channels or setup Join-to-Create',
   aliases: [
@@ -148,10 +29,10 @@ module.exports = {
   module: 'join_to_create',
 
   async execute(interaction, client, settings) {
-    const sub = interaction.options.getSubcommand();
+    const sub = interaction.options.getSubcommand(false);
 
-    // HUB
-    if (sub === 'hub') {
+    // Default: HUB
+    if (!sub || sub === 'hub') {
       const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
       const isAdmin = isOwnerOrAdmin(member, interaction.guild, client);
       const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });

@@ -14,61 +14,17 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ticket')
-    .setDescription('Create ticket panels, manage support tickets, or configure settings')
-    .addSubcommand(sub =>
-      sub.setName('hub')
-        .setDescription('Open the interactive Support & Ticket guidance and configuration hub')
-    )
-    .addSubcommand(sub =>
-      sub.setName('panel')
-        .setDescription('Create and post a support ticket panel with interactive button (Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Channel where the panel will be posted (defaults to current)')
-            .addChannelTypes(ChannelType.GuildText)
-        )
-        .addStringOption(opt => opt.setName('title').setDescription('Panel title'))
-        .addStringOption(opt => opt.setName('description').setDescription('Panel description'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('setup')
-        .setDescription('Configure ticket category and support staff role (Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('category')
-            .setDescription('Parent category where new tickets are created')
-            .addChannelTypes(ChannelType.GuildCategory)
-            .setRequired(true)
-        )
-        .addRoleOption(opt => opt.setName('staff_role').setDescription('Role for support staff members'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('close')
-        .setDescription('Close and archive the current support ticket')
-    )
-    .addSubcommand(sub =>
-      sub.setName('claim')
-        .setDescription('Claim the current support ticket')
-    )
-    .addSubcommand(sub =>
-      sub.setName('add')
-        .setDescription('Add a user to this ticket channel')
-        .addUserOption(opt => opt.setName('user').setDescription('User to add').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Remove a user from this ticket channel')
-        .addUserOption(opt => opt.setName('user').setDescription('User to remove').setRequired(true))
-    ),
+    .setDescription('Interactive Support & Ticket Hub (Panels, Tickets, Manager, Setup)'),
   name: 'ticket',
   description: 'Manage support tickets',
   aliases: ['ticket-panel', 'ticketpanel', 'close', 'claim'],
   module: 'tickets',
 
   async execute(interaction, client) {
-    const sub = interaction.options.getSubcommand();
+    const sub = interaction.options.getSubcommand(false);
 
-    // HUB
-    if (sub === 'hub') {
+    // Default: HUB
+    if (!sub || sub === 'hub') {
       const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
       const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
       const currentTicket = await Ticket.findOne({ channelId: interaction.channel.id }).catch(() => null);

@@ -16,59 +16,18 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('games')
-    .setDescription('Play minigames or configure game channels')
-    .addSubcommand(sub =>
-      sub.setName('hub')
-        .setDescription('Open the interactive Minigames & activity guidance hub')
-    )
-    .addSubcommand(sub =>
-      sub.setName('rps')
-        .setDescription('Play Rock Paper Scissors with another user or the bot')
-        .addUserOption(opt => opt.setName('opponent').setDescription('Choose an opponent (leave empty to play bot)'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('trivia')
-        .setDescription('Answer an interactive trivia question')
-    )
-    .addSubcommand(sub =>
-      sub.setName('counting-setup')
-        .setDescription('Set the designated counting game channel (Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Counting channel')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(true)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('counting-status')
-        .setDescription('View current counting game progress and high score')
-    )
-    .addSubcommand(sub =>
-      sub.setName('wordchain-setup')
-        .setDescription('Set the designated word-chain channel (Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Word chain channel')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(true)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('wordchain-status')
-        .setDescription('View current word chain streak and last word')
-    ),
+    .setDescription('Interactive Minigames & Community Activity Hub (RPS, Trivia, Counting, Word Chain)'),
   name: 'games',
   description: 'Play minigames or configure game channels',
   aliases: ['rps', 'trivia', 'counting', 'wordchain'],
   module: 'minigames',
 
   async execute(interaction, client) {
-    const sub = interaction.options.getSubcommand();
+    const sub = interaction.options.getSubcommand(false);
     const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
 
-    // HUB
-    if (sub === 'hub') {
+    // Default: HUB
+    if (!sub || sub === 'hub') {
       const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
       const embed = await gamesHub.buildHubEmbed(interaction.guild, guildDoc, interaction.user, isAdmin);
       const components = gamesHub.buildHubComponents(isAdmin, guildDoc);

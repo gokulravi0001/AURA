@@ -9,53 +9,17 @@ const { COLORS } = require('../../../shared/constants');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('system')
-    .setDescription('System diagnostics, status, and developer controls')
-    .addSubcommand(sub =>
-      sub.setName('status')
-        .setDescription('View live bot status, WebSocket ping, uptime, and database health')
-    )
-    .addSubcommand(sub =>
-      sub.setName('maintenance')
-        .setDescription('Toggle system maintenance mode (Developer only)')
-        .addStringOption(opt =>
-          opt.setName('action')
-            .setDescription('Maintenance action')
-            .setRequired(true)
-            .addChoices(
-              { name: 'Status', value: 'status' },
-              { name: 'Enable (Turn ON)', value: 'on' },
-              { name: 'Disable (Turn OFF)', value: 'off' }
-            )
-        )
-        .addStringOption(opt => opt.setName('message').setDescription('Custom message displayed during maintenance'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('blacklist')
-        .setDescription('Manage blacklisted users and servers (Developer only)')
-        .addStringOption(opt =>
-          opt.setName('action')
-            .setDescription('Blacklist action')
-            .setRequired(true)
-            .addChoices(
-              { name: 'List', value: 'list' },
-              { name: 'Add User', value: 'add_user' },
-              { name: 'Add Server', value: 'add_guild' },
-              { name: 'Remove Target', value: 'remove' }
-            )
-        )
-        .addStringOption(opt => opt.setName('target_id').setDescription('User or Server Discord ID'))
-        .addStringOption(opt => opt.setName('reason').setDescription('Reason for blacklist'))
-    ),
+    .setDescription('View live bot status, WebSocket ping, uptime, and database health'),
   name: 'system',
-  description: 'System diagnostics and developer controls',
-  aliases: ['sys', 'diag', 'ping', 'stats'],
+  description: 'View live bot status, WebSocket ping, uptime, and database health',
+  aliases: ['sys', 'status', 'diag', 'ping', 'stats'],
   module: null,
 
   async execute(interaction, client) {
-    const sub = interaction.options.getSubcommand();
+    const sub = interaction.options.getSubcommand(false);
 
-    // 1. STATUS / PING
-    if (sub === 'status') {
+    // 1. STATUS / PING (Default)
+    if (!sub || sub === 'status') {
       const dbHealth = await getDatabaseHealth();
       const mem = process.memoryUsage();
       const uptime = process.uptime();

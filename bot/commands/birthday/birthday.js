@@ -18,57 +18,17 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('bday')
-    .setDescription('Register, view, list, or configure birthdays')
-    .addSubcommand(sub =>
-      sub.setName('hub')
-        .setDescription('Open the interactive Birthday guidance & configuration hub')
-    )
-    .addSubcommand(sub =>
-      sub.setName('set')
-        .setDescription('Save your birthday or another member\'s birthday with country/timezone')
-        .addStringOption(opt => opt.setName('date').setDescription('Birthday date (e.g. 24/10 or 15/05/2000)').setRequired(true))
-        .addUserOption(opt => opt.setName('user').setDescription('Target member to save birthday for (leave empty for yourself)'))
-        .addStringOption(opt => opt.setName('timezone').setDescription('Country or Timezone (e.g. India, USA, UK, IST, EST, UTC+5:30)'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('view')
-        .setDescription('View your or another member\'s registered birthday and countdown')
-        .addUserOption(opt => opt.setName('user').setDescription('Target member (leave empty to view your own)'))
-    )
-    .addSubcommand(sub =>
-      sub.setName('list')
-        .setDescription('List upcoming birthdays on this server')
-    )
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Remove your registered birthday')
-    )
-    .addSubcommand(sub =>
-      sub.setName('setup')
-        .setDescription('Configure birthday wish channel and registration channel (Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('wish_channel')
-            .setDescription('Channel where birthday wishes and celebrant pings are posted')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(true)
-        )
-        .addChannelOption(opt =>
-          opt.setName('set_channel')
-            .setDescription('Channel where members type their birthday in DD/MM/YYYY (auto-deleted & saved)')
-            .addChannelTypes(ChannelType.GuildText)
-        )
-        .addRoleOption(opt => opt.setName('role').setDescription('Special role to give on member birthdays'))
-    ),
+    .setDescription('Interactive Birthday Hub (Register, View, Countdowns, Setup)'),
   name: 'bday',
   description: 'Register, view, or configure birthdays',
   aliases: ['birthday', 'bd'],
   module: 'birthdays',
 
   async execute(interaction, client, settings) {
-    const sub = interaction.options.getSubcommand();
+    const sub = interaction.options.getSubcommand(false);
 
-    // HUB
-    if (sub === 'hub') {
+    // Default: HUB
+    if (!sub || sub === 'hub') {
       const isAdmin = isOwnerOrAdmin(interaction.member || interaction.user, interaction.guild, client);
       const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
       const embed = await birthdayHub.buildHubEmbed(interaction.guild, guildDoc, interaction.user, isAdmin);

@@ -7,34 +7,10 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('level')
-    .setDescription('Interactive Leveling & XP Hub (Rank, Leaderboard, Rewards, Settings)')
-    .addSubcommand(sub =>
-      sub.setName('hub')
-        .setDescription('Open the Interactive Leveling Hub')
-    )
-    .addSubcommand(sub =>
-      sub.setName('view')
-        .setDescription('View current server leveling parameters')
-    )
-    .addSubcommand(sub =>
-      sub.setName('channel')
-        .setDescription('Set the level-up announcement channel (Admin only)')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Announcement channel (leave empty to announce where user is chatting)')
-            .addChannelTypes(ChannelType.GuildText)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('rates')
-        .setDescription('Configure min/max XP per message and cooldown (Admin only)')
-        .addIntegerOption(opt => opt.setName('min').setDescription('Minimum XP per message').setRequired(true))
-        .addIntegerOption(opt => opt.setName('max').setDescription('Maximum XP per message').setRequired(true))
-        .addIntegerOption(opt => opt.setName('cooldown').setDescription('Cooldown between messages in seconds').setRequired(true))
-    ),
-  name: 'levels',
+    .setDescription('Interactive Leveling & XP Hub (Rank, Leaderboard, Rewards, Settings)'),
+  name: 'level',
   description: 'Interactive Leveling & XP Hub (Rank, Leaderboard, Rewards, Settings)',
-  aliases: ['level', 'leveling', 'xp', 'levelsettings', 'level-settings'],
+  aliases: ['levels', 'leveling', 'xp', 'levelsettings', 'level-settings'],
   module: 'leveling',
 
   async execute(interaction, client, settings) {

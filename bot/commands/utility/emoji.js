@@ -10,37 +10,11 @@ const { hasPermissionOrOwner } = require('../../../shared/permissionHelper');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('emoji')
-    .setDescription('Add, mass add, selectively steal, or install emoji packs')
-    .addSubcommand(sub =>
-      sub.setName('steal')
-        .setDescription('Detect and mass add or selectively add emojis from custom emojis or text')
-        .addStringOption(opt =>
-          opt.setName('emojis')
-            .setDescription('Paste one or multiple custom emojis or image URLs')
-            .setRequired(true)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('add')
-        .setDescription('Add a single emoji from a custom emoji or image URL')
-        .addStringOption(opt =>
-          opt.setName('target')
-            .setDescription('Custom emoji (<:name:id>) or image URL')
-            .setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt.setName('name')
-            .setDescription('Custom name for the new emoji')
-            .setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('packs')
-        .setDescription('Browse and install curated emoji packs (Pepe, Anime, Gaming, Aesthetic, Badges)')
-    )
-    .addSubcommand(sub =>
-      sub.setName('list')
-        .setDescription('View current server emoji slots, statistics, and installed emojis')
+    .setDescription('Emoji Stealer, Slots & Curated Packs Hub')
+    .addStringOption(opt =>
+      opt.setName('input')
+        .setDescription('Paste custom emoji(s) or image URLs to steal (leave empty for packs & slots hub)')
+        .setRequired(false)
     ),
 
   name: 'emoji',
@@ -69,7 +43,31 @@ module.exports = {
       });
     }
 
-    const sub = interaction.options.getSubcommand();
+    const sub = interaction.options.getSubcommand(false);
+    const input = interaction.options.getString('input') || interaction.options.getString('emojis') || interaction.options.getString('target');
+
+    if (!input && (!sub || sub === 'hub' || sub === 'packs')) {
+      const panel = emojiManager.buildPacksPanel(guild);
+      return interaction.reply({ embeds: panel.embeds, components: panel.components });
+    }
+
+    if (input) {
+      const parsed = emojiManager.parseEmojis(input);
+      if (!parsed.length) {
+        return interaction.reply({ content: '❌ No custom emojis or image URLs detected.', ephemeral: true });
+      }
+
+      if (parsed.length === 1) {
+        await interaction.deferReply();
+        const results = await emojiManager.uploadEmojis(guild, parsed, interaction.user);
+        const resultEmbed = emojiManager.buildResultEmbed(results, guild, interaction.user);
+        return interaction.editReply({ embeds: [resultEmbed] });
+      }
+
+      const sessionId = emojiManager.createSession(interaction.user.id, guild.id, parsed, 'Detected Emojis');
+      const panel = emojiManager.buildSelectivePanel(sessionId, guild);
+      return interaction.reply({ embeds: panel.embeds, components: panel.components });
+    }
 
     // 2. PACKS
     if (sub === 'packs') {
