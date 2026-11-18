@@ -1,0 +1,23 @@
+{
+  "common": {
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "unauthorized": "You lack the required permissions to perform this action.",
+    "botMissingPerms": "I do not have the required permissions to execute this command.",
+    "cooldown": "⏳ Please wait **{seconds}s** before using `{command}` again.",
+    "maintenance": "🔧 **AURA is currently undergoing scheduled system maintenance.** Regular commands are temporarily paused. Diagnostics remain active for developers.",
+    "blacklisted": "🚫 Access restricted: You or this server have been restricted from accessing AURA features. (Reason: {reason})"
+  },
+  "modules": {
+    "disabled": "⚠️ The **{module}** module is disabled on this server. An administrator can enable it with `+modules on {module}` or `/modules`."
+  },
+  "leveling": {
+    "levelUp": "🎉 Congratulations {user}, you leveled up to **Level {level}**!",
+    "rankCard": "{user}'s Rank • Level {level} • {xp}/{nextXp} XP"
+  },
+  "birthdays": {
+    "saved": "🎂 Your birthday has been saved for **{date}**!",
+    "wish": "🎉 Happy Birthday {user}! Wishing you an awesome day!"
+  }
+}

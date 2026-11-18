@@ -1583,6 +1583,227 @@ function createServerTagTestContext(options = {}) {
     Ticket.findOne = origTicketFindOne;
   });
 
+  // 31. Core Database Management, Health & Backup/Restore
+  test('Core: Database Health, Migrations & Backup/Restore Service', async () => {
+    const { getDatabaseHealth } = require('../shared/database');
+    const backupService = require('../shared/backupService');
+    const DatabaseBackup = require('../models/DatabaseBackup');
+
+    // 1. Test database health structure
+    const health = await getDatabaseHealth();
+    assert.ok(health.status, 'Health report must contain status');
+    assert.ok(['healthy', 'degraded', 'unhealthy'].includes(health.status));
+    assert.ok(health.state, 'State string must be present');
+
+    // 2. Test Backup creation mock
+    const origCreate = DatabaseBackup.create;
+    const origFind = DatabaseBackup.find;
+    const origFindOne = DatabaseBackup.findOne;
+
+    let createdBackup = null;
+    DatabaseBackup.create = async (payload) => {
+      createdBackup = { ...payload };
+      return createdBackup;
+    };
+    DatabaseBackup.find = () => ({
+      sort: () => ({
+        lean: async () => [
+          { backupId: 'backup_test_1', name: 'Test Backup', totalDocuments: 42, sizeBytes: 1024, createdAt: new Date() }
+        ]
+      })
+    });
+    DatabaseBackup.findOne = () => ({
+      lean: async () => ({
+        backupId: 'backup_test_1',
+        data: { guilds: [], user_xp: [] }
+      })
+    });
+
+    const backupResult = await backupService.createBackup({ name: 'Automated Unit Backup' });
+    assert.ok(backupResult.backupId.startsWith('backup_'), 'Backup ID must have valid format');
+    assert.strictEqual(backupResult.name, 'Automated Unit Backup');
+
+    // 3. Test listing backups
+    const list = await backupService.listBackups();
+    assert.strictEqual(list.length, 1);
+    assert.strictEqual(list[0].backupId, 'backup_test_1');
+
+    // 4. Test restore without confirmation fails
+    let threwError = false;
+    try {
+      await backupService.restoreBackup('backup_test_1', { confirm: false });
+    } catch (e) {
+      threwError = true;
+      assert.ok(e.message.includes('Confirmation parameter'), 'Must reject unconfirmed restore');
+    }
+    assert.strictEqual(threwError, true, 'Restore without confirm: true must throw');
+
+    // 5. Test restore with confirmation succeeds
+    const restoreResult = await backupService.restoreBackup('backup_test_1', { confirm: true });
+    assert.strictEqual(restoreResult.success, true);
+    assert.strictEqual(restoreResult.backupId, 'backup_test_1');
+
+    DatabaseBackup.create = origCreate;
+    DatabaseBackup.find = origFind;
+    DatabaseBackup.findOne = origFindOne;
+  });
+
+  // 32. Centralized Multi-Level Logging & Sensitive Credential Masking
+  test('Core: Centralized Logging, Error Masking & Deduplication', async () => {
+    const logger = require('../shared/logger');
+
+    // 1. Test token masking (constructed dynamically to prevent false-positive static secret scanning)
+    const part1 = 'mock_sample_token_part1_1234';
+    const part2 = 'sample';
+    const part3 = 'mock_sample_token_part3_longer_than_27_chars';
+    const fakeToken = `${part1}.${part2}.${part3}`;
+    const fakeMongoUri = 'mongodb+srv://aura_admin:superSecretPassword123@cluster0.abcde.mongodb.net/aura_db';
+    const fakeWebhook = 'https://discord.com/api/webhooks/1234567890/tokenABCDEF123456';
+    const fakeSecret = 'client_secret=secretKeyXYZ987654';
+
+    const sampleLog = `Connected bot token: ${fakeToken} with DB: ${fakeMongoUri} and webhook ${fakeWebhook} with ${fakeSecret}`;
+    const sanitized = logger.maskSensitive(sampleLog);
+
+    assert.ok(!sanitized.includes(fakeToken), 'Bot token must be masked');
+    assert.ok(!sanitized.includes('superSecretPassword123'), 'DB password must be masked');
+    assert.ok(!sanitized.includes('tokenABCDEF123456'), 'Webhook secret must be masked');
+    assert.ok(!sanitized.includes('secretKeyXYZ987654'), 'OAuth2 secret must be masked');
+    assert.ok(sanitized.includes('DISCORD_TOKEN_REDACTED'));
+    assert.ok(sanitized.includes('****@'));
+
+    // 2. Test error deduplication
+    const errKey = 'test_err_key_unique_123';
+    assert.strictEqual(logger.shouldSuppressDuplicate(errKey), false, 'First occurrence should not be suppressed');
+    assert.strictEqual(logger.shouldSuppressDuplicate(errKey), true, 'Immediate subsequent occurrence must be suppressed');
+  });
+
+  // 33. Security System, Rate Limiting & Developer Access Guard
+  test('Core: Security System, Rate Limiting & Developer Access Guard', async () => {
+    const { requireDeveloper, sanitizeInput } = require('../api/middleware/security');
+
+    // 1. Test unauthorized user trying to access developer middleware
+    let statusCode = null;
+    let jsonResponse = null;
+    const regularRes = {
+      status: (code) => { statusCode = code; return regularRes; },
+      json: (data) => { jsonResponse = data; return regularRes; }
+    };
+    const regularReq = {
+      session: {
+        user: { id: 'regular_user_999', username: 'RandomGuy' }
+      }
+    };
+    let nextCalled = false;
+    requireDeveloper(regularReq, regularRes, () => { nextCalled = true; });
+    assert.strictEqual(statusCode, 403, 'Regular user must receive 403 Forbidden');
+    assert.strictEqual(nextCalled, false, 'Next must not be called for non-developer');
+
+    // 2. Test developer access
+    const devReq = {
+      session: {
+        user: { id: '1487429529717706842', username: 'redflash00' }
+      }
+    };
+    let devNextCalled = false;
+    requireDeveloper(devReq, regularRes, () => { devNextCalled = true; });
+    assert.strictEqual(devNextCalled, true, 'Developer must pass through requireDeveloper');
+
+    // 3. Test input sanitization (prototype pollution protection)
+    const dirtyReq = {
+      body: {
+        normalKey: 'safeValue',
+        __proto__: { polluted: true },
+        nested: { constructor: 'bad', safe: 123 }
+      }
+    };
+    sanitizeInput(dirtyReq, {}, () => {});
+    assert.strictEqual(dirtyReq.body.normalKey, 'safeValue');
+    assert.strictEqual(dirtyReq.body.nested.safe, 123);
+    assert.strictEqual(dirtyReq.body.__proto__.polluted, undefined);
+  });
+
+  // 34. Maintenance Mode, Blacklist System, Cooldown Engine & Localization
+  test('Core: Maintenance Mode, Blacklist, Command Cooldowns & Localization', async () => {
+    const maintenanceService = require('../shared/maintenanceService');
+    const blacklistService = require('../shared/blacklistService');
+    const cooldownService = require('../shared/cooldownService');
+    const i18n = require('../shared/i18n');
+    const SystemConfig = require('../models/SystemConfig');
+    const Blacklist = require('../models/Blacklist');
+
+    // Stub DB updates
+    const origConfigUpdate = SystemConfig.updateOne;
+    const origBlFindOneAndUpdate = Blacklist.findOneAndUpdate;
+    const origBlFindOneAndDelete = Blacklist.findOneAndDelete;
+    SystemConfig.updateOne = async () => ({ acknowledged: true });
+    Blacklist.findOneAndUpdate = async (q, u) => u;
+    Blacklist.findOneAndDelete = async () => ({ targetId: 'user_bad_1' });
+
+    // 1. Maintenance Mode
+    await maintenanceService.enableMaintenance({ message: 'Custom Maintenance Test', updatedBy: 'TestDev' });
+    assert.strictEqual(maintenanceService.isMaintenanceActive(), true);
+    assert.strictEqual(maintenanceService.canBypassMaintenance('1487429529717706842'), true);
+    assert.strictEqual(maintenanceService.canBypassMaintenance('regular_user_999'), false);
+    await maintenanceService.disableMaintenance({ updatedBy: 'TestDev' });
+    assert.strictEqual(maintenanceService.isMaintenanceActive(), false);
+
+    // 2. Blacklist System
+    await blacklistService.addBlacklist({
+      targetId: 'user_bad_1',
+      type: 'user',
+      reason: 'Spamming interactions',
+      blacklistedBy: '1487429529717706842'
+    });
+    const check1 = blacklistService.isBlacklisted('user_bad_1', null);
+    assert.strictEqual(check1.blacklisted, true);
+    assert.strictEqual(check1.type, 'user');
+
+    const checkSafe = blacklistService.isBlacklisted('user_clean_999', 'guild_clean_888');
+    assert.strictEqual(checkSafe.blacklisted, false);
+
+    await blacklistService.removeBlacklist('user_bad_1');
+    const checkAfterRemove = blacklistService.isBlacklisted('user_bad_1', null);
+    assert.strictEqual(checkAfterRemove.blacklisted, false);
+
+    // 3. Command Cooldowns
+    const cd1 = cooldownService.checkCooldown({
+      commandName: 'testcmd',
+      userId: 'user_cd_1',
+      durationSeconds: 2
+    });
+    assert.strictEqual(cd1, null, 'First execution should have no cooldown');
+
+    const cd2 = cooldownService.checkCooldown({
+      commandName: 'testcmd',
+      userId: 'user_cd_1',
+      durationSeconds: 2
+    });
+    assert.ok(cd2 !== null, 'Immediate second execution must return cooldown');
+    assert.ok(Number(cd2.remainingSeconds) > 0);
+
+    // Bypassed for Bot Developer
+    const cdDev = cooldownService.checkCooldown({
+      commandName: 'testcmd',
+      userId: '1487429529717706842',
+      durationSeconds: 2
+    });
+    assert.strictEqual(cdDev, null, 'Bot developer must bypass cooldowns');
+
+    // 4. Localization Engine (i18n)
+    const msg = i18n.t('common.cooldown', { seconds: '3.5', command: 'ping' });
+    assert.ok(msg.includes('3.5s'));
+    assert.ok(msg.includes('ping'));
+
+    const levelMsg = i18n.t('leveling.levelUp', { user: '@Gokul', level: '10' });
+    assert.ok(levelMsg.includes('@Gokul'));
+    assert.ok(levelMsg.includes('Level 10'));
+
+    // Restore stubs
+    SystemConfig.updateOne = origConfigUpdate;
+    Blacklist.findOneAndUpdate = origBlFindOneAndUpdate;
+    Blacklist.findOneAndDelete = origBlFindOneAndDelete;
+  });
+
   guildService.getSettings = originalGetSettings;
   guildService.updateSettings = originalUpdateSettings;
 

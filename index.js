@@ -16,6 +16,14 @@ async function startAura() {
   // 1. Connect to MongoDB
   await connectDatabase();
 
+  // 1b. Initialize Core Services (Migrations, Maintenance cache, Blacklist cache)
+  const migrationRunner = require('./shared/migrationRunner');
+  const maintenanceService = require('./shared/maintenanceService');
+  const blacklistService = require('./shared/blacklistService');
+  await migrationRunner.runMigrations().catch(() => {});
+  await maintenanceService.init().catch(() => {});
+  await blacklistService.init().catch(() => {});
+
   // 2. Load Discord Handlers
   loadCommands(client);
   loadEvents(client);

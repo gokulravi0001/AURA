@@ -81,6 +81,10 @@ function buildHelpEmbed(prefix, client) {
       {
         name: '⚡ Auto-Delete Within 1s (/autodlt)',
         value: `\`/autodlt target:@user duration:<time>\` • \`${prefix}autodlt @user <duration>\` • \`${prefix}autodlt stop @user\` • \`${prefix}autodlt list\`\n*Allows target user to send messages, but automatically deletes every message they send within a second for the specified duration (e.g. 30s, 5m, 1h)!*`
+      },
+      {
+        name: '👑 Developer Core Controls (Developer Only)',
+        value: `\`${prefix}maintenance [on|off|status]\` • \`${prefix}blacklist [add|remove|list]\`\n*Control global maintenance mode and ban abusive users or servers across all AURA interactions!*`
       }
     )
     .setFooter({ text: `Type ${prefix}help or /help anytime • Prefix: ${prefix}` })

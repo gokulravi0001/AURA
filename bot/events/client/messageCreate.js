@@ -5,6 +5,9 @@ const { COLORS } = require('../../../shared/constants');
 const { isBotOwner, isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const whitelistService = require('../../../shared/whitelistService');
 const trustedService = require('../../../shared/trustedService');
+const blacklistService = require('../../../shared/blacklistService');
+const maintenanceService = require('../../../shared/maintenanceService');
+const cooldownService = require('../../../shared/cooldownService');
 
 // Module handlers
 const levelingService = require('../../modules/levelingService');
@@ -44,6 +47,18 @@ module.exports = {
     // Auto-Delete / Shadow-Mute Guard: Automatically deletes messages in silenced channels or by silenced users
     const autoDeleted = await autoDeleteService.handleMessage(message, settings, client);
     if (autoDeleted) return;
+
+    // Blacklist Check: Silently ignore blacklisted users or servers
+    const blacklistCheck = blacklistService.isBlacklisted(message.author.id, message.guild.id);
+    if (blacklistCheck.blacklisted) return;
+
+    // Maintenance Mode Check: Prevent regular command usage during maintenance
+    if (maintenanceService.isMaintenanceActive() && !isBotOwner(message.author.id, client)) {
+      if (message.content.startsWith(prefix)) {
+        return message.reply({ content: maintenanceService.getStatus().message }).catch(() => {});
+      }
+      return;
+    }
 
     // 1. PREFIX COMMAND HANDLING (+)
     if (message.content.startsWith(prefix)) {
@@ -98,6 +113,19 @@ module.exports = {
                 content: `🚫 You lack the required permissions to use this command: \`${missing.join(', ')}\``
               }).catch(() => {});
             }
+          }
+
+          // Cooldown check (bypassed for owners & trusted members)
+          const cd = cooldownService.checkCooldown({
+            commandName: resolvedName,
+            userId: message.author.id,
+            guildId: message.guild.id,
+            durationSeconds: command.cooldown || 3,
+            client,
+            settings
+          });
+          if (cd) {
+            return message.reply({ content: `⏳ Please wait **${cd.remainingSeconds}s** before using \`${prefix}${resolvedName}\` again.` }).catch(() => {});
           }
 
           try {

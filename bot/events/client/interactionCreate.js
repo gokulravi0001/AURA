@@ -5,11 +5,31 @@ const { COLORS } = require('../../../shared/constants');
 const { isBotOwner, isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const whitelistService = require('../../../shared/whitelistService');
 const trustedService = require('../../../shared/trustedService');
+const blacklistService = require('../../../shared/blacklistService');
+const maintenanceService = require('../../../shared/maintenanceService');
+const cooldownService = require('../../../shared/cooldownService');
 
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction, client) {
     try {
+      // 0a. Blacklist Check
+      const blacklistCheck = blacklistService.isBlacklisted(interaction.user.id, interaction.guildId);
+      if (blacklistCheck.blacklisted) {
+        return interaction.reply({
+          content: `🚫 Your access to AURA has been restricted. (Reason: ${blacklistCheck.details?.reason || 'Policy Violation'})`,
+          ephemeral: true
+        });
+      }
+
+      // 0b. Maintenance Mode Check
+      if (maintenanceService.isMaintenanceActive() && !isBotOwner(interaction.user.id, client)) {
+        return interaction.reply({
+          content: maintenanceService.getStatus().message,
+          ephemeral: true
+        });
+      }
+
       // 1. Handle Slash Commands
       if (interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
@@ -72,6 +92,22 @@ module.exports = {
               ephemeral: true
             });
           }
+        }
+
+        // Cooldown check (bypassed for owners & trusted members)
+        const cd = cooldownService.checkCooldown({
+          commandName: interaction.commandName,
+          userId: interaction.user.id,
+          guildId: interaction.guildId,
+          durationSeconds: command.cooldown || 3,
+          client,
+          settings
+        });
+        if (cd) {
+          return interaction.reply({
+            content: `⏳ Please wait **${cd.remainingSeconds}s** before using \`/${interaction.commandName}\` again.`,
+            ephemeral: true
+          });
         }
 
         await command.execute(interaction, client, settings);
