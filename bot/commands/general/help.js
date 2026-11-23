@@ -44,7 +44,7 @@ function buildHelpEmbed(prefix, client) {
       },
       {
         name: '🔊 Voice & Lounges Hub (`/vc` • `+vc`)',
-        value: `*Slash:* \`/vc\` • *Shortcuts:* \`${prefix}bounce\`, \`${prefix}massmove\`, \`${prefix}massdc\`\nInteractive hub: 1-click Join-to-Create setup, lounge controls (lock, unlock, hide, show, limit, rename), and voice bounce.`
+        value: `*Slash:* \`/vc\` • *Shortcuts:* \`${prefix}vc status\`, \`${prefix}vcstatus\`, \`${prefix}bounce\`, \`${prefix}massmove\`\nInteractive hub: 24/7 Permanent VC status, 1-click Join-to-Create setup, lounge controls (lock, unlock, hide, show, limit, rename), and voice bounce.`
       },
       {
         name: '🎫 Support & Tickets Hub (`/ticket` • `+ticket`)',

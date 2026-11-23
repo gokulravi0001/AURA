@@ -12,15 +12,28 @@ const { isOwnerOrAdmin } = require('../../../shared/permissionHelper');
 const bounceManager = require('../../modules/bounceManager');
 const immunityService = require('../../../shared/immunityService');
 const voiceHub = require('../../modules/voiceHub');
+const voiceStatusService = require('../../modules/voiceStatusService');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('vc')
-    .setDescription('Interactive Voice & Lounges Hub (Join-to-Create, Lounge Controls, Bounce)'),
+    .setDescription('Interactive Voice & Lounges Hub (Join-to-Create, Lounge Controls, VC Status)')
+    .addStringOption(opt =>
+      opt.setName('status')
+        .setDescription('Set permanent 24/7 status for a voice channel (type "clear" to remove)')
+        .setRequired(false)
+    )
+    .addChannelOption(opt =>
+      opt.setName('channel')
+        .setDescription('Voice channel to configure (defaults to your current voice channel)')
+        .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+        .setRequired(false)
+    ),
   name: 'vc',
   description: 'Manage temporary voice channels or setup Join-to-Create',
   aliases: [
     'voice', 'tempvoice',
+    'vcstatus', 'permstatus', 'voicestatus',
     'massmove', 'movevc',
     'massdc', 'massdisconnect', 'vcdc', 'disconnectvc',
     'massmute', 'massunmute', 'vcmute', 'vcunmute', 'mutevc', 'unmutevc',
@@ -29,6 +42,45 @@ module.exports = {
   module: 'join_to_create',
 
   async execute(interaction, client, settings) {
+    const statusOption = interaction.options.getString('status');
+    const channelOption = interaction.options.getChannel('channel');
+
+    // Direct permanent VC status setting via slash option
+    if (statusOption !== null) {
+      const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
+      const isAdmin = isOwnerOrAdmin(member, interaction.guild, client);
+      if (!isAdmin) {
+        return interaction.reply({ content: '🚫 Only Administrators or Trusted Members can configure permanent voice channel statuses.', ephemeral: true });
+      }
+
+      const voiceState = interaction.guild.voiceStates.cache.get(member.id);
+      const targetChannel = channelOption || voiceState?.channel;
+
+      if (!targetChannel) {
+        return interaction.reply({
+          content: '❌ Please specify a voice channel or connect to one first: `/vc status:"Your Status" [channel:#vc]`',
+          ephemeral: true
+        });
+      }
+
+      if (statusOption.toLowerCase() === 'clear' || statusOption.toLowerCase() === 'off' || statusOption.toLowerCase() === 'remove') {
+        await voiceStatusService.removePermanentStatus(interaction.guild, targetChannel.id, client);
+        return interaction.reply({ content: `✅ Permanent voice status removed from <#${targetChannel.id}>.`, ephemeral: true });
+      }
+
+      try {
+        const res = await voiceStatusService.setPermanentStatus(interaction.guild, targetChannel.id, statusOption, interaction.user.tag, client);
+        const embed = new EmbedBuilder()
+          .setColor(COLORS.SUCCESS)
+          .setTitle('📌 Permanent VC Status Set')
+          .setDescription(`Successfully set permanent status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n*This status will be automatically preserved 24/7 across leaves, empty rooms, and bot restarts.*`)
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed] });
+      } catch (err) {
+        return interaction.reply({ content: `❌ ${err.message}`, ephemeral: true });
+      }
+    }
+
     const sub = interaction.options.getSubcommand(false);
 
     // Default: HUB
@@ -559,6 +611,8 @@ module.exports = {
   },
 
   async executePrefix(message, args, client, settings) {
+    const prefix = settings?.prefix || '+';
+    const invokedCommand = message.content.slice(prefix.length).trim().split(/ +/)[0]?.toLowerCase();
     const action = args[0]?.toLowerCase();
 
     // +vc (no args) or +vc hub
@@ -572,6 +626,70 @@ module.exports = {
       const embed = await voiceHub.buildHubEmbed(message.guild, guildDoc, member, isAdmin);
       const components = voiceHub.buildHubComponents(member, isAdmin, guildDoc, voiceChannel, tempDoc);
       return message.reply({ embeds: [embed], components });
+    }
+
+    // +vc status [#channel] <text> OR +vcstatus [#channel] <text>
+    const isStatusAction = action === 'status' || action === 'permstatus' || action === 'vcstatus' || invokedCommand === 'vcstatus' || invokedCommand === 'permstatus';
+
+    if (isStatusAction) {
+      const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
+      if (!isAdmin) {
+        return message.reply('🚫 Only Administrators or Trusted Members can configure permanent voice channel statuses.');
+      }
+
+      let targetChannel = message.mentions.channels.first();
+      let remainingArgs = targetChannel
+        ? args.slice(1).filter(a => !a.startsWith('<#'))
+        : (action && ['status', 'permstatus', 'vcstatus'].includes(action) ? args.slice(1) : args);
+
+      if (!targetChannel && remainingArgs[0] && /^\d{17,20}$/.test(remainingArgs[0])) {
+        targetChannel = message.guild.channels.cache.get(remainingArgs[0]);
+        if (targetChannel) remainingArgs = remainingArgs.slice(1);
+      }
+
+      if (!targetChannel) {
+        targetChannel = message.member.voice?.channel;
+      }
+
+      if (!targetChannel || !targetChannel.isVoiceBased()) {
+        return message.reply(
+          '❌ Please join a voice channel or mention one!\n' +
+          '• **Set Status:** `+vc status [#channel] <status text>` (or `+vcstatus <text>` if in VC)\n' +
+          '• **Remove Status:** `+vc status [#channel] clear`\n' +
+          '• **View Statuses:** `+vc status list`'
+        );
+      }
+
+      const statusText = remainingArgs.join(' ').trim();
+      if (!statusText || statusText.toLowerCase() === 'list') {
+        const list = await voiceStatusService.getStatuses(message.guild.id);
+        const embed = new EmbedBuilder()
+          .setColor(COLORS.PRIMARY)
+          .setTitle(`📌 Permanent Voice Channel Statuses — ${message.guild.name}`)
+          .setDescription(
+            list.length > 0
+              ? list.map(s => `• <#${s.channelId}>: **"${s.status}"** *(24/7 Permanent)*`).join('\n')
+              : '*No permanent voice statuses configured yet on this server.*\n\n*Usage: `+vc status [#channel] <text>`*'
+          );
+        return message.reply({ embeds: [embed] });
+      }
+
+      if (statusText.toLowerCase() === 'clear' || statusText.toLowerCase() === 'off' || statusText.toLowerCase() === 'remove') {
+        await voiceStatusService.removePermanentStatus(message.guild, targetChannel.id, client);
+        return message.reply(`✅ Removed permanent voice status from <#${targetChannel.id}>.`);
+      }
+
+      try {
+        const res = await voiceStatusService.setPermanentStatus(message.guild, targetChannel.id, statusText, message.author.tag, client);
+        const embed = new EmbedBuilder()
+          .setColor(COLORS.SUCCESS)
+          .setTitle('📌 Permanent VC Status Set')
+          .setDescription(`Successfully set permanent status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n*This status will be automatically preserved 24/7 across leaves, empty rooms, and bot restarts.*`)
+          .setTimestamp();
+        return message.reply({ embeds: [embed] });
+      } catch (err) {
+        return message.reply(`❌ ${err.message}`);
+      }
     }
 
     // +vc setup
@@ -625,8 +743,6 @@ module.exports = {
     }
 
     // +vc move <#to> [#from] OR +massmove <#to> [#from]
-    const prefix = settings?.prefix || '+';
-    const invokedCommand = message.content.slice(prefix.length).trim().split(/ +/)[0]?.toLowerCase();
     const isMoveAction = action === 'move' || action === 'massmove' || invokedCommand === 'massmove' || invokedCommand === 'movevc';
 
     if (isMoveAction) {

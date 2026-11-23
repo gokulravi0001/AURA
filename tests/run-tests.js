@@ -263,9 +263,13 @@ test('Features: Voice Controls & Mass Actions (Move, DC, Mute, Unmute) Command',
   assert.ok(voice.aliases.includes('bounce'));
   assert.ok(voice.aliases.includes('vcbounce'));
   assert.ok(voice.aliases.includes('orbit'));
+  assert.ok(voice.aliases.includes('vcstatus'));
+  assert.ok(voice.aliases.includes('permstatus'));
 
   const json = voice.data.toJSON();
   assert.strictEqual(json.name, 'vc');
+  assert.ok(json.options.find(o => o.name === 'status'));
+  assert.ok(json.options.find(o => o.name === 'channel'));
   assert.ok(typeof voice.execute === 'function');
   assert.ok(typeof voice.executePrefix === 'function');
 
@@ -1781,6 +1785,84 @@ function createServerTagTestContext(options = {}) {
 
     const memberComps = moderationHub.buildHubComponents(false);
     assert.strictEqual(memberComps.length, 0, 'Non-staff members should see no admin action buttons');
+  });
+
+  // 36. Permanent Voice Channel Status Service & Hub Integration
+  await test('Permanent Voice Channel Status Service & Hub Integration (/vc status, +vcstatus)', async () => {
+    const voiceStatusService = require('../bot/modules/voiceStatusService');
+    const voiceHub = require('../bot/modules/voiceHub');
+    const { ChannelType } = require('discord.js');
+
+    const restCalls = [];
+    const mockClient = {
+      rest: {
+        put: async (route, options) => {
+          restCalls.push({ route, body: options?.body });
+          return { success: true };
+        }
+      },
+      guilds: {
+        cache: new Map()
+      }
+    };
+
+    const mockChannel = {
+      id: 'vc_1001',
+      name: 'Lofi Lounge',
+      type: ChannelType.GuildVoice,
+      permissionsFor: () => ({
+        has: () => true
+      })
+    };
+
+    const mockGuild = {
+      id: 'g_perm_vc_test',
+      name: 'Voice Status Test Guild',
+      channels: {
+        cache: new Map([[mockChannel.id, mockChannel]]),
+        fetch: async (id) => id === mockChannel.id ? mockChannel : null
+      },
+      members: {
+        fetchMe: async () => ({
+          permissions: { has: () => true }
+        })
+      }
+    };
+
+    // 1. Set permanent status
+    const setResult = await voiceStatusService.setPermanentStatus(mockGuild, 'vc_1001', '🎵 24/7 Lofi & Chill', 'DevGokul', mockClient);
+    assert.strictEqual(setResult.status, '🎵 24/7 Lofi & Chill');
+    assert.ok(restCalls.length >= 1);
+    assert.strictEqual(restCalls[restCalls.length - 1].body.status, '🎵 24/7 Lofi & Chill');
+
+    // 2. Lookup permanent status
+    const getResult = await voiceStatusService.getStatus(mockGuild.id, 'vc_1001');
+    assert.ok(getResult);
+    assert.strictEqual(getResult.status, '🎵 24/7 Lofi & Chill');
+
+    // 3. Raw packet handling (enforcing when altered)
+    const rawPacket = {
+      t: 'VOICE_CHANNEL_STATUS_UPDATE',
+      d: { id: 'vc_1001', guild_id: mockGuild.id, status: null } // Discord cleared it
+    };
+    await voiceStatusService.handleRawPacket(rawPacket, mockClient);
+
+    // 4. Remove permanent status
+    await voiceStatusService.removePermanentStatus(mockGuild, 'vc_1001', mockClient);
+    const clearedResult = await voiceStatusService.getStatus(mockGuild.id, 'vc_1001');
+    assert.strictEqual(clearedResult, null);
+    assert.strictEqual(restCalls[restCalls.length - 1].body.status, '');
+
+    // 5. Verify Hub Embed & Components
+    const mockGuildDoc = {
+      permanentVoiceStatuses: [{ channelId: 'vc_1001', status: '🎧 Study Room', enabled: true }]
+    };
+    const embed = await voiceHub.buildHubEmbed(mockGuild, mockGuildDoc, { id: 'user_1' }, true);
+    assert.ok(embed.data.fields.some(f => f.name.includes('Permanent Voice Channel Statuses')));
+
+    const comps = voiceHub.buildHubComponents({ id: 'user_1' }, true, mockGuildDoc, null, null);
+    assert.ok(comps[0].components[0].data.options.some(o => o.value === 'act_vc_perm_status'));
+    assert.ok(comps[comps.length - 1].components.some(b => b.data.custom_id === 'btn_vchub_perm_status'));
   });
 
   guildService.getSettings = originalGetSettings;

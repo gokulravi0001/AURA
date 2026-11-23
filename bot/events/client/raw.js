@@ -1,12 +1,14 @@
 const guildService = require('../../../shared/guildService');
 const logger = require('../../../shared/logger');
 const serverTagService = require('../../modules/serverTagService');
+const voiceStatusService = require('../../modules/voiceStatusService');
 
 module.exports = {
   name: 'raw',
   async execute(packet, client) {
     try {
       serverTagService.handleRawPacket(packet);
+      voiceStatusService.handleRawPacket(packet, client);
 
       // Handle uncached member/user updates where discord.js skips userUpdate/guildMemberUpdate
       if (packet?.t !== 'GUILD_MEMBER_UPDATE' || !packet.d?.guild_id || !packet.d?.user?.id) {

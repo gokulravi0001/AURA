@@ -7,6 +7,7 @@ const inviteService = require('../../modules/inviteService');
 const whitelistService = require('../../../shared/whitelistService');
 const autoDeleteService = require('../../../shared/autoDeleteService');
 const serverTagService = require('../../modules/serverTagService');
+const voiceStatusService = require('../../modules/voiceStatusService');
 
 module.exports = {
   name: 'ready',
@@ -45,7 +46,10 @@ module.exports = {
       // Start Server Tag Auto Role periodic + startup sync after member caches settle
       serverTagService.init(client);
 
-      logger.info('Background schedulers & caches initialized (Birthdays, Bump Reminders, Sticky Messages, Invites, Server Tag Roles, Guild Members).');
+      // Initialize Permanent Voice Channel Status Service
+      await voiceStatusService.init(client);
+
+      logger.info('Background schedulers & caches initialized (Birthdays, Bump Reminders, Sticky Messages, Invites, Server Tag Roles, Voice Status, Guild Members).');
     } catch (err) {
       logger.error('Error starting background schedulers:', err.message);
     }

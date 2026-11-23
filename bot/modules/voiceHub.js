@@ -16,6 +16,7 @@ const Guild = require('../../models/Guild');
 const guildService = require('../../shared/guildService');
 const voiceManager = require('./voiceManager');
 const bounceManager = require('./bounceManager');
+const voiceStatusService = require('./voiceStatusService');
 const immunityService = require('../../shared/immunityService');
 const { COLORS } = require('../../shared/constants');
 const { isOwnerOrAdmin } = require('../../shared/permissionHelper');
@@ -79,14 +80,25 @@ const voiceHub = {
           name: `🎧 Your Voice Status (<@${member.id}>)`,
           value: voiceDetails
         }
-      )
-      .setFooter({ text: 'AURA Voice Suite • Custom lounges auto-delete when empty' })
+      );
+
+    const permStatuses = (guildDoc?.permanentVoiceStatuses || []).filter(s => s.enabled);
+    const permStatusText = permStatuses.length > 0
+      ? permStatuses.map(s => `• <#${s.channelId}>: **"${s.status}"** *(24/7 Permanent)*`).join('\n')
+      : '*No permanent voice statuses configured yet.*';
+
+    embed.addFields({
+      name: '📌 Permanent Voice Channel Statuses',
+      value: permStatusText
+    });
+
+    embed.setFooter({ text: 'AURA Voice Suite • Custom lounges auto-delete when empty' })
       .setTimestamp();
 
     if (isAdmin) {
       embed.addFields({
         name: '🛡️ Administrator Controls Enabled',
-        value: 'You have full access to auto-setup Join-to-Create, perform mass moves, mass disconnects, mass mutes, and voice bounces.'
+        value: 'You have full access to auto-setup Join-to-Create, set permanent VC statuses, perform mass moves, mass disconnects, mass mutes, and voice bounces.'
       });
     }
 
@@ -150,6 +162,11 @@ const voiceHub = {
           .setLabel('Auto-Setup Join-to-Create')
           .setDescription('Create category and trigger channel in 1 click')
           .setEmoji('🚀'),
+        new StringSelectMenuOptionBuilder()
+          .setValue('act_vc_perm_status')
+          .setLabel('Set Permanent VC Status')
+          .setDescription('Set or clear a permanent 24/7 topic/status for a voice channel')
+          .setEmoji('📌'),
         new StringSelectMenuOptionBuilder()
           .setValue('act_vc_massmove_guide')
           .setLabel('Mass Move Members')
@@ -238,7 +255,12 @@ const voiceHub = {
           .setCustomId('btn_vchub_massmute')
           .setLabel('Mass Mute')
           .setStyle(ButtonStyle.Secondary)
-          .setEmoji('🔇')
+          .setEmoji('🔇'),
+        new ButtonBuilder()
+          .setCustomId('btn_vchub_perm_status')
+          .setLabel('VC Status')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('📌')
       );
       components.push(adminRow);
     }
@@ -402,6 +424,43 @@ const voiceHub = {
         ephemeral: true
       });
     }
+
+    if (customId === 'btn_vchub_perm_status') {
+      if (!isAdmin) return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
+      return this.showPermStatusModal(interaction, voiceChannel);
+    }
+  },
+
+  /**
+   * Helper to show the Permanent VC Status Modal
+   */
+  showPermStatusModal(interaction, voiceChannel) {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_vchub_permstatus')
+      .setTitle('Set Permanent VC Status');
+
+    const channelInput = new TextInputBuilder()
+      .setCustomId('channel_id_input')
+      .setLabel('Voice Channel ID / Mention (empty = your VC)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('e.g. 123456789012345678')
+      .setValue(voiceChannel ? voiceChannel.id : '')
+      .setRequired(false);
+
+    const statusInput = new TextInputBuilder()
+      .setCustomId('status_text_input')
+      .setLabel('Permanent Status (or type "clear" to remove)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('e.g. 🎵 24/7 Chill Vibes & Lofi')
+      .setMaxLength(500)
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(channelInput),
+      new ActionRowBuilder().addComponents(statusInput)
+    );
+
+    return interaction.showModal(modal);
   },
 
   /**
@@ -528,6 +587,11 @@ const voiceHub = {
       return interaction.update({ embeds: [embed], components });
     }
 
+    if (selected === 'act_vc_perm_status') {
+      if (!isAdmin) return interaction.reply({ content: '🚫 Administrator permission required.', ephemeral: true });
+      return this.showPermStatusModal(interaction, voiceChannel);
+    }
+
     if (selected === 'act_vc_massmove_guide') {
       return interaction.reply({
         content: '🚚 **Mass Move Quick Guide:**\nUse `/vc move to:<#channel> [from:<#channel>]` or `+vc move <#to> [#from]` to move all members in one command.',
@@ -555,6 +619,51 @@ const voiceHub = {
    */
   async handleModal(interaction, client) {
     const customId = interaction.customId;
+
+    // Handle Permanent VC Status Modal
+    if (customId === 'modal_vchub_permstatus') {
+      const channelRaw = interaction.fields.getTextInputValue('channel_id_input')?.trim();
+      const statusText = interaction.fields.getTextInputValue('status_text_input')?.trim();
+
+      let targetChannelId = null;
+      if (channelRaw) {
+        targetChannelId = channelRaw.replace(/[<#>]/g, '').trim();
+      } else {
+        const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
+        const voiceState = interaction.guild.voiceStates.cache.get(member.id);
+        targetChannelId = voiceState?.channelId;
+      }
+
+      if (!targetChannelId) {
+        return interaction.reply({
+          content: '❌ Please enter a voice channel ID or join a voice channel first before submitting.',
+          ephemeral: true
+        });
+      }
+
+      const targetChannel = interaction.guild.channels.cache.get(targetChannelId) || await interaction.guild.channels.fetch(targetChannelId).catch(() => null);
+      if (!targetChannel) {
+        return interaction.reply({ content: `❌ Voice channel \`${targetChannelId}\` was not found in this server.`, ephemeral: true });
+      }
+
+      if (statusText.toLowerCase() === 'clear' || statusText.toLowerCase() === 'off' || statusText.toLowerCase() === 'remove') {
+        await voiceStatusService.removePermanentStatus(interaction.guild, targetChannel.id, client);
+        return interaction.reply({ content: `✅ Permanent voice status removed from <#${targetChannel.id}>.`, ephemeral: true });
+      }
+
+      try {
+        const res = await voiceStatusService.setPermanentStatus(interaction.guild, targetChannel.id, statusText, interaction.user.tag, client);
+        const embed = new EmbedBuilder()
+          .setColor(COLORS.SUCCESS)
+          .setTitle('📌 Permanent VC Status Set')
+          .setDescription(`Successfully set permanent status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n*This status will be automatically preserved 24/7 across leaves, empty rooms, and bot restarts.*`)
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed] });
+      } catch (err) {
+        return interaction.reply({ content: `❌ ${err.message}`, ephemeral: true });
+      }
+    }
+
     const channelId = customId.split('_')[3];
     const channel = interaction.guild.channels.cache.get(channelId);
 

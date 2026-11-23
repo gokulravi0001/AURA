@@ -59,6 +59,14 @@ const GuildSchema = new mongoose.Schema({
     bitrate: { type: Number, default: 64000 }
   },
 
+  permanentVoiceStatuses: [{
+    channelId: { type: String, required: true },
+    status: { type: String, required: true },
+    enabled: { type: Boolean, default: true },
+    setBy: { type: String, default: null },
+    updatedAt: { type: Date, default: Date.now }
+  }],
+
   imageThreads: {
     enabled: { type: Boolean, default: false },
     channelId: { type: String, default: null },

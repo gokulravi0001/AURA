@@ -3,6 +3,7 @@ const guildService = require('../../../shared/guildService');
 const voiceManager = require('../../modules/voiceManager');
 const counterService = require('../../modules/counterService');
 const statsService = require('../../modules/statsService');
+const voiceStatusService = require('../../modules/voiceStatusService');
 
 module.exports = {
   name: 'voiceStateUpdate',
@@ -26,6 +27,9 @@ module.exports = {
 
         // Track live voice participation stats
         statsService.updateVoiceCount(guild.id, guild);
+
+        // 3. Permanent Voice Channel Status Preserver
+        voiceStatusService.handleVoiceStateUpdate(oldState, newState, client);
       }
     } catch (err) {
       logger.error('Error in voiceStateUpdate event:', err);
