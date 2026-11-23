@@ -1886,6 +1886,14 @@ function createServerTagTestContext(options = {}) {
     assert.ok(slashEmbed.data.fields.some(f => f.name.includes('/vc')));
     assert.ok(slashEmbed.data.fields.some(f => f.name.includes('/mod')));
 
+    // Verify alphabetical ordering of slash commands (A-Z)
+    const slashCmdNames = slashEmbed.data.fields.map(f => {
+      const match = f.name.match(/\(\/([a-z]+)\)/i);
+      return match ? match[1] : '';
+    });
+    const sortedSlashCmdNames = [...slashCmdNames].sort((a, b) => a.localeCompare(b));
+    assert.deepStrictEqual(slashCmdNames, sortedSlashCmdNames, 'Slash commands in help must be in alphabetical order');
+
     const slashButtons = helpCmd.buildSlashButtons();
     assert.ok(slashButtons.components.some(c => c.data.custom_id === 'btn_help_prefix'));
     assert.ok(slashButtons.components.some(c => c.data.custom_id === 'btn_help_home'));
