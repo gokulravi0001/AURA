@@ -166,6 +166,13 @@ module.exports = {
           return;
         }
 
+        // Help interactive menu buttons: btn_help_
+        if (customId.startsWith('btn_help_')) {
+          const helpCmd = require('../../commands/general/help');
+          await helpCmd.handleButton(interaction, client);
+          return;
+        }
+
         // Temp Voice controls: vc_lock, vc_unlock, vc_hide, vc_show, vc_rename, vc_limit, vc_claim, vc_delete
         if (customId.startsWith('vc_')) {
           const voiceManager = require('../../modules/voiceManager');

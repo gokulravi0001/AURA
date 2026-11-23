@@ -1662,15 +1662,12 @@ function createServerTagTestContext(options = {}) {
 
     // 3. Test input sanitization (prototype pollution protection)
     const dirtyReq = {
-      body: {
-        normalKey: 'safeValue',
-        __proto__: { polluted: true },
-        nested: { constructor: 'bad', safe: 123 }
-      }
+      body: JSON.parse('{"normalKey": "safeValue", "__proto__": {"polluted": true}, "nested": {"constructor": "bad", "safe": 123}}')
     };
     sanitizeInput(dirtyReq, {}, () => {});
     assert.strictEqual(dirtyReq.body.normalKey, 'safeValue');
     assert.strictEqual(dirtyReq.body.nested.safe, 123);
+    assert.strictEqual(dirtyReq.body.nested.constructor, Object.prototype.constructor);
     assert.strictEqual(dirtyReq.body.__proto__.polluted, undefined);
   });
 
@@ -1863,6 +1860,87 @@ function createServerTagTestContext(options = {}) {
     const comps = voiceHub.buildHubComponents({ id: 'user_1' }, true, mockGuildDoc, null, null);
     assert.ok(comps[0].components[0].data.options.some(o => o.value === 'act_vc_perm_status'));
     assert.ok(comps[comps.length - 1].components.some(b => b.data.custom_id === 'btn_vchub_perm_status'));
+  });
+
+  // 37. Interactive Help Command: 2-Option Dual-Directory Embed & Buttons
+  await asyncTest('Help: Interactive 2-option embed, Slash vs Prefix directory views & button navigation', async () => {
+    const helpCmd = require('../bot/commands/general/help');
+    const mockClient = { user: { id: 'bot_aura_1' } };
+    
+    // 1. Initial 2-choice embed & buttons
+    const initialEmbed = helpCmd.buildInitialHelpEmbed('+');
+    assert.ok(initialEmbed.data.title.includes('AURA Command Directory & Guide'));
+    assert.ok(initialEmbed.data.description.includes('Option 1: Slash Commands'));
+    assert.ok(initialEmbed.data.description.includes('Option 2: Prefix Commands'));
+    assert.ok(initialEmbed.data.fields.some(f => f.name.includes('Current Server Prefix')));
+
+    const initialButtons = helpCmd.buildInitialButtons();
+    const btnIds = initialButtons.components.map(c => c.data.custom_id || c.data.url);
+    assert.ok(btnIds.includes('btn_help_slash'));
+    assert.ok(btnIds.includes('btn_help_prefix'));
+
+    // 2. Slash Directory Embed & Buttons
+    const slashEmbed = helpCmd.buildSlashHelpEmbed('+');
+    assert.ok(slashEmbed.data.title.includes('Slash Commands'));
+    assert.ok(slashEmbed.data.fields.some(f => f.name.includes('/level')));
+    assert.ok(slashEmbed.data.fields.some(f => f.name.includes('/vc')));
+    assert.ok(slashEmbed.data.fields.some(f => f.name.includes('/mod')));
+
+    const slashButtons = helpCmd.buildSlashButtons();
+    assert.ok(slashButtons.components.some(c => c.data.custom_id === 'btn_help_prefix'));
+    assert.ok(slashButtons.components.some(c => c.data.custom_id === 'btn_help_home'));
+
+    // 3. Prefix Directory Embed & Buttons
+    const prefixEmbed = helpCmd.buildPrefixHelpEmbed('+');
+    assert.ok(prefixEmbed.data.title.includes('Prefix Commands'));
+    assert.ok(prefixEmbed.data.fields.some(f => f.name.includes('Leveling & XP')));
+    assert.ok(prefixEmbed.data.fields.some(f => f.name.includes('Voice & Lounges')));
+    assert.ok(prefixEmbed.data.fields.some(f => f.name.includes('Moderation & Chat Protection')));
+
+    const prefixButtons = helpCmd.buildPrefixButtons();
+    assert.ok(prefixButtons.components.some(c => c.data.custom_id === 'btn_help_slash'));
+    assert.ok(prefixButtons.components.some(c => c.data.custom_id === 'btn_help_home'));
+
+    // 4. Interactive button handler transitions
+    let updatePayload = null;
+    const mockInteraction = {
+      guildId: 'guild_test',
+      customId: 'btn_help_slash',
+      update: async (data) => { updatePayload = data; }
+    };
+
+    // Click Slash
+    await helpCmd.handleButton(mockInteraction, mockClient);
+    assert.ok(updatePayload);
+    assert.ok(updatePayload.embeds[0].data.title.includes('Slash Commands'));
+
+    // Click Prefix
+    mockInteraction.customId = 'btn_help_prefix';
+    await helpCmd.handleButton(mockInteraction, mockClient);
+    assert.ok(updatePayload.embeds[0].data.title.includes('Prefix Commands'));
+
+    // Click Home
+    mockInteraction.customId = 'btn_help_home';
+    await helpCmd.handleButton(mockInteraction, mockClient);
+    assert.ok(updatePayload.embeds[0].data.title.includes('AURA Command Directory & Guide'));
+
+    // 5. Direct prefix command arguments
+    let replyPayload = null;
+    const mockMessage = {
+      reply: async (data) => { replyPayload = data; }
+    };
+
+    // +help prefix
+    await helpCmd.executePrefix(mockMessage, ['prefix'], mockClient, { prefix: '+' });
+    assert.ok(replyPayload.embeds[0].data.title.includes('Prefix Commands'));
+
+    // +help slash
+    await helpCmd.executePrefix(mockMessage, ['slash'], mockClient, { prefix: '+' });
+    assert.ok(replyPayload.embeds[0].data.title.includes('Slash Commands'));
+
+    // +help (no args)
+    await helpCmd.executePrefix(mockMessage, [], mockClient, { prefix: '+' });
+    assert.ok(replyPayload.embeds[0].data.title.includes('AURA Command Directory & Guide'));
   });
 
   guildService.getSettings = originalGetSettings;
