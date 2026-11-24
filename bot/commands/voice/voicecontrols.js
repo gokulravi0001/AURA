@@ -54,11 +54,17 @@ module.exports = {
       }
 
       const voiceState = interaction.guild.voiceStates.cache.get(member.id);
-      const targetChannel = channelOption || voiceState?.channel;
+      let targetChannel = channelOption || voiceState?.channel;
+
+      if (!targetChannel) {
+        targetChannel = interaction.guild.channels.cache.find(c =>
+          (c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildStageVoice || (typeof c.isVoiceBased === 'function' && c.isVoiceBased()))
+        );
+      }
 
       if (!targetChannel) {
         return interaction.reply({
-          content: '❌ Please specify a voice channel or connect to one first: `/vc status:"Your Status" [channel:#vc]`',
+          content: '❌ No voice channels found in this server. Please create a voice channel first or connect to one!',
           ephemeral: true
         });
       }
@@ -635,8 +641,9 @@ module.exports = {
       return message.reply({ embeds: [embed], components });
     }
 
-    // +vc status [#channel] <text> OR +vcstatus [#channel] <text>
-    const isStatusAction = action === 'status' || action === 'permstatus' || action === 'vcstatus' || invokedCommand === 'vcstatus' || invokedCommand === 'permstatus';
+    // +vc stats [#channel] [<e1>] [<e2>] OR +vc status [#channel] <text> OR +vcstatus
+    const isStatsAction = action === 'stats' || invokedCommand === 'vcstats';
+    const isStatusAction = isStatsAction || action === 'status' || action === 'permstatus' || action === 'vcstatus' || invokedCommand === 'vcstatus' || invokedCommand === 'permstatus';
 
     if (isStatusAction) {
       const isAdmin = isOwnerOrAdmin(message.member || message.author, message.guild, client);
@@ -644,33 +651,49 @@ module.exports = {
         return message.reply('🚫 Only Administrators or Trusted Members can configure permanent voice channel statuses.');
       }
 
-      let targetChannel = message.mentions.channels.first();
+      let targetChannel = message.mentions?.channels?.first ? message.mentions.channels.first() : null;
       let remainingArgs = targetChannel
         ? args.slice(1).filter(a => !a.startsWith('<#'))
-        : (action && ['status', 'permstatus', 'vcstatus'].includes(action) ? args.slice(1) : args);
+        : (action && ['status', 'permstatus', 'vcstatus', 'stats'].includes(action) ? args.slice(1) : args);
 
       if (!targetChannel && remainingArgs[0] && /^\d{17,20}$/.test(remainingArgs[0])) {
-        targetChannel = message.guild.channels.cache.get(remainingArgs[0]);
-        if (targetChannel) remainingArgs = remainingArgs.slice(1);
+        const found = message.guild.channels.cache.get(remainingArgs[0]);
+        if (found && (found.type === ChannelType.GuildVoice || found.type === ChannelType.GuildStageVoice || (typeof found.isVoiceBased === 'function' && found.isVoiceBased()))) {
+          targetChannel = found;
+          remainingArgs = remainingArgs.slice(1);
+        }
       }
 
       if (!targetChannel) {
         targetChannel = message.member.voice?.channel;
       }
 
-      if (!targetChannel || !targetChannel.isVoiceBased()) {
+      // If user is not in a voice channel and didn't mention one, automatically pick the first voice channel in the server!
+      if (!targetChannel) {
+        targetChannel = message.guild.channels.cache.find(c =>
+          (c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildStageVoice || (typeof c.isVoiceBased === 'function' && c.isVoiceBased()))
+        );
+      }
+
+      if (!targetChannel || (typeof targetChannel.isVoiceBased === 'function' && !targetChannel.isVoiceBased())) {
         return message.reply(
-          '❌ Please join a voice channel or mention one!\n' +
-          '• **Live Online & Members Status:** `+vcstatus stats [<online_emoji>] [<members_emoji>]` *(e.g. `+vcstatus stats <:online:123> <:members:456>`)*\n' +
-          '• **Custom Template:** `+vcstatus <:dot:123> {online} Online • <:peeps:456> {members} Members`\n' +
-          '• **Set Custom Status:** `+vc status [#channel] <status text>` (or `+vcstatus <text>`)\n' +
+          '❌ No voice channels found in this server. Please create a voice channel or connect to one first!\n' +
+          '• **Automatic Live Stats Status:** `+vc stats` *(automatically puts live online & member counts in VC)*\n' +
+          '• **With Custom Emojis:** `+vc stats [<online_emoji>] [<members_emoji>]`\n' +
+          '• **Custom Text Status:** `+vc status [#channel] <text>`\n' +
           '• **Remove Status:** `+vc status [#channel] clear`\n' +
           '• **View Statuses:** `+vc status list`'
         );
       }
 
-      const statusText = remainingArgs.join(' ').trim();
-      if (!statusText || statusText.toLowerCase() === 'list') {
+      let statusText = remainingArgs.join(' ').trim();
+
+      // If user entered "+vc stats" (with optional emojis or channel) or empty "+vcstatus", automatically make it a stats template!
+      if (isStatsAction || (!statusText && (invokedCommand === 'vcstatus' || action === 'vcstatus'))) {
+        statusText = remainingArgs.length > 0 ? `stats ${remainingArgs.join(' ')}` : 'stats';
+      }
+
+      if (statusText.toLowerCase() === 'list') {
         const list = await voiceStatusService.getStatuses(message.guild.id);
         const embed = new EmbedBuilder()
           .setColor(COLORS.PRIMARY)
@@ -682,7 +705,7 @@ module.exports = {
                   const display = s.lastAppliedStatus || s.status;
                   return `• <#${s.channelId}>: **"${display}"** ${isDyn ? '*(🔄 Live Dynamic — No Bots)*' : '*(24/7 Permanent)*'}`;
                 }).join('\n')
-              : '*No permanent voice statuses configured yet on this server.*\n\n*Usage: `+vcstatus stats [<emoji1>] [<emoji2>]` or `+vc status [#channel] <text>`*'
+              : '*No permanent voice statuses configured yet on this server.*\n\n*Usage: `+vc stats` to automatically enable live online & member counts!*'
           );
         return message.reply({ embeds: [embed] });
       }
@@ -696,13 +719,14 @@ module.exports = {
         const res = await voiceStatusService.setPermanentStatus(message.guild, targetChannel.id, statusText, message.author.tag, client);
         const embed = new EmbedBuilder()
           .setColor(COLORS.SUCCESS)
-          .setTitle(res.isDynamic ? '📊 Live Dynamic VC Status Set' : '📌 Permanent VC Status Set')
+          .setTitle(res.isDynamic ? '📊 Live Dynamic VC Status Enabled' : '📌 Permanent VC Status Set')
           .setDescription(
             res.isDynamic
-              ? `Successfully set live dynamic status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n` +
-                `• **Template:** \`${res.template}\`\n` +
-                `• **Live Counts (No Bots):** 🟢 **${res.counts?.onlineHumans ?? 0}** Online • 👥 **${res.counts?.humanMembers ?? 0}** Human Members\n\n` +
-                `*This status continuously auto-updates as members join, leave, or change status, strictly excluding bots.*`
+              ? `Successfully applied live dynamic status to <#${targetChannel.id}>:\n\n**"${res.status}"**\n\n` +
+                `• **Channel:** <#${targetChannel.id}>\n` +
+                `• **Format:** \`${res.template}\`\n` +
+                `• **Live Counts (No Bots):** **${res.counts?.onlineHumans ?? 0}** Online • **${res.counts?.humanMembers ?? 0}** Human Members\n\n` +
+                `*AURA will automatically update this status 24/7 as members join, leave, or go online!*`
               : `Successfully set permanent status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n*This status will be automatically preserved 24/7 across leaves, empty rooms, and bot restarts.*`
           )
           .setTimestamp();

@@ -14,16 +14,55 @@ const pendingDynamicUpdates = new Set();
 
 const voiceStatusService = {
   /**
+   * Automatically discover best custom emojis from the guild for Online and Members
+   */
+  getAutoCustomEmojis(guild) {
+    const emojis = guild?.emojis?.cache || new Map();
+    let onlineEmoji = null;
+    let membersEmoji = null;
+
+    if (typeof emojis.forEach === 'function') {
+      emojis.forEach(e => {
+        const name = (e.name || '').toLowerCase();
+        // Online keywords: online, dot, green, pulse, live, active, circle, status
+        if (!onlineEmoji && /online|dot|green|pulse|live|active|circle|status/i.test(name)) {
+          onlineEmoji = e.toString();
+        }
+        // Member keywords: member, user, peep, people, human, crowd, star, aura, team
+        if (!membersEmoji && /member|user|peep|people|human|crowd|star|aura|team|gang|bro/i.test(name)) {
+          membersEmoji = e.toString();
+        }
+      });
+
+      const emojiList = Array.from(emojis.values());
+      if (!onlineEmoji && emojiList.length > 0) {
+        onlineEmoji = emojiList[0].toString();
+      }
+      if (!membersEmoji && emojiList.length > 1) {
+        membersEmoji = emojiList[1].toString();
+      } else if (!membersEmoji && emojiList.length === 1 && onlineEmoji !== emojiList[0].toString()) {
+        membersEmoji = emojiList[0].toString();
+      }
+    }
+
+    if (!onlineEmoji) onlineEmoji = '🟢';
+    if (!membersEmoji) membersEmoji = '👥';
+
+    return { onlineEmoji, membersEmoji };
+  },
+
+  /**
    * Parse status input and expand 'stats' shorthand with custom emojis
    * e.g. 'stats <:online:123> <:members:456>' -> '<:online:123> {online} Online • <:members:456> {members} Members'
-   * or 'stats' -> '🟢 {online} Online • 👥 {members} Members'
+   * or 'stats' -> automatically discovers server custom emojis or '🟢 {online} Online • 👥 {members} Members'
    */
-  parseStatsTemplate(input) {
+  parseStatsTemplate(input, guild = null) {
     const trimmed = (input || '').trim();
     if (/^stats\b/i.test(trimmed)) {
       const parts = trimmed.split(/\s+/).slice(1);
-      const onlineEmoji = parts[0] || '🟢';
-      const membersEmoji = parts[1] || '👥';
+      const auto = guild ? this.getAutoCustomEmojis(guild) : { onlineEmoji: '🟢', membersEmoji: '👥' };
+      const onlineEmoji = parts[0] || auto.onlineEmoji;
+      const membersEmoji = parts[1] || auto.membersEmoji;
       return `${onlineEmoji} {online} Online • ${membersEmoji} {members} Members`;
     }
     return trimmed;
@@ -120,8 +159,8 @@ const voiceStatusService = {
       throw new Error('Status text cannot be empty. Use remove to clear status.');
     }
 
-    // Parse stats template shorthand if provided
-    const parsedTemplate = this.parseStatsTemplate(rawStatus);
+    // Parse stats template shorthand if provided (auto-discovering custom emojis from guild)
+    const parsedTemplate = this.parseStatsTemplate(rawStatus, guild);
     const isDynamic = this.isDynamicTemplate(parsedTemplate);
 
     let evaluatedStatus = parsedTemplate;

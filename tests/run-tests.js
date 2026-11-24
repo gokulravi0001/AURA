@@ -1756,7 +1756,7 @@ function createServerTagTestContext(options = {}) {
   });
 
   // 35. Moderation Hub & Clean System Diagnostics
-  await test('Interactive Moderation Hub & System Diagnostics Hub (/mod & /system)', async () => {
+  await asyncTest('Interactive Moderation Hub & System Diagnostics Hub (/mod & /system)', async () => {
     const moderationHub = require('../bot/modules/moderationHub');
     const modCmd = require('../bot/commands/moderation/mod');
     const systemCmd = require('../bot/commands/general/system');
@@ -1774,20 +1774,22 @@ function createServerTagTestContext(options = {}) {
     // Embed validation
     const embedAdmin = await moderationHub.buildHubEmbed(mockGuild, mockDoc, mockUser, true);
     assert.ok(embedAdmin.data.title.includes('Moderation & Chat Protection Hub'));
-    assert.ok(embedAdmin.data.fields.some(f => f.name.includes('Purge & Chat Cleaning')));
+    assert.ok(embedAdmin.data.fields.some(f => f.name.includes('Quick Purge Tools')));
     assert.ok(embedAdmin.data.fields.some(f => f.name.includes('1-Second Auto-Delete')));
 
     // Component validation: admin vs member
     const adminComps = moderationHub.buildHubComponents(true);
     assert.ok(adminComps.length >= 2, 'Admin components should include select menu and action buttons');
-    assert.ok(adminComps[0].components[0].data.options.some(o => o.value === 'mod_purge_prompt'));
+    const modOpts = adminComps[0].components[0].options || adminComps[0].components[0].data?.options || [];
+    assert.ok(modOpts.some(o => (o.data?.value || o.value) === 'act_mod_purge_prompt'));
 
     const memberComps = moderationHub.buildHubComponents(false);
-    assert.strictEqual(memberComps.length, 0, 'Non-staff members should see no admin action buttons');
+    assert.strictEqual(memberComps.length, 2, 'Members see dropdown + member refresh button row');
+    assert.ok(!memberComps[1].components.some(b => b.data.custom_id === 'btn_mod_purge'), 'Non-staff members should see no admin action buttons');
   });
 
   // 36. Permanent Voice Channel Status Service & Hub Integration
-  await test('Permanent Voice Channel Status Service & Hub Integration (/vc status, +vcstatus)', async () => {
+  await asyncTest('Permanent Voice Channel Status Service & Hub Integration (/vc status, +vcstatus)', async () => {
     const voiceStatusService = require('../bot/modules/voiceStatusService');
     const voiceHub = require('../bot/modules/voiceHub');
     const { ChannelType } = require('discord.js');
@@ -2129,6 +2131,42 @@ function createServerTagTestContext(options = {}) {
     const statusField = embed.data.fields.find(f => f.name.includes('Permanent Voice Channel Statuses'));
     assert.ok(statusField.value.includes('Live Dynamic — No Bots'));
     assert.ok(statusField.value.includes('<:dot:999> 4 Online • <:peeps:888> 9 Members'));
+
+    // 8. Auto Custom Emoji Discovery from Server Emojis
+    mockGuild.emojis = {
+      cache: new Map([
+        ['emj_online', { id: '12345', name: 'green_online_dot', toString() { return '<:green_online_dot:12345>'; } }],
+        ['emj_members', { id: '67890', name: 'aura_members_glow', toString() { return '<:aura_members_glow:67890>'; } }]
+      ])
+    };
+    const autoEmojis = voiceStatusService.getAutoCustomEmojis(mockGuild);
+    assert.strictEqual(autoEmojis.onlineEmoji, '<:green_online_dot:12345>');
+    assert.strictEqual(autoEmojis.membersEmoji, '<:aura_members_glow:67890>');
+
+    const autoTemplate = voiceStatusService.parseStatsTemplate('stats', mockGuild);
+    assert.strictEqual(autoTemplate, '<:green_online_dot:12345> {online} Online • <:aura_members_glow:67890> {members} Members');
+
+    // 9. Automatic 1-command "+vc stats" execution
+    const voiceCmd = require('../bot/commands/voice/voicecontrols');
+    let cmdReply = null;
+    const mockMsg = {
+      content: '+vc stats',
+      guild: mockGuild,
+      member: {
+        id: 'admin_1',
+        permissions: { has: () => true },
+        voice: { channel: mockChannel }
+      },
+      author: { id: 'admin_1', tag: 'Admin#0001' },
+      mentions: { channels: new Map() },
+      reply: async (data) => { cmdReply = data; }
+    };
+
+    await voiceCmd.executePrefix(mockMsg, ['stats'], mockClient, { prefix: '+' });
+    assert.ok(cmdReply);
+    assert.ok(cmdReply.embeds[0].data.title.includes('Live Dynamic VC Status Enabled'));
+    assert.ok(cmdReply.embeds[0].data.description.includes('green_online_dot'));
+    assert.ok(cmdReply.embeds[0].data.description.includes('aura_members_glow'));
 
     Guild.findOne = origGuildFindOne;
     Guild.create = origGuildCreate;

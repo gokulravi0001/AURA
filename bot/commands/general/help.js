@@ -261,7 +261,7 @@ function buildPrefixHelpEmbed(prefix) {
       },
       {
         name: '🔊 Voice & Lounges',
-        value: `\`${prefix}bounce @user [rounds]\` • \`${prefix}massdc [#vc]\` • \`${prefix}massmove <#to> [#from]\` • \`${prefix}massmute [#vc]\` • \`${prefix}vc [lock|unlock|hide|show|limit|rename|panel]\` • \`${prefix}vc setup\` • \`${prefix}vc status [#vc] <text>\` • \`${prefix}vcstatus [text|stats <e1> <e2>]\` *(Live Online & Member Counts VC Status)*`
+        value: `\`${prefix}bounce @user [rounds]\` • \`${prefix}massdc [#vc]\` • \`${prefix}massmove <#to> [#from]\` • \`${prefix}massmute [#vc]\` • \`${prefix}vc [lock|unlock|hide|show|limit|rename|panel]\` • \`${prefix}vc setup\` • \`${prefix}vc stats\` *(Auto live online & member counts VC status)* • \`${prefix}vc status [#vc] <text>\` • \`${prefix}vcstatus [stats|<e1> <e2>|text]\``
       }
     )
     .setFooter({ text: `Alphabetical Order • Switch options below or type ${prefix}help` })
