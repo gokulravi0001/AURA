@@ -20,7 +20,7 @@ module.exports = {
     .setDescription('Interactive Voice & Lounges Hub (Join-to-Create, Lounge Controls, VC Status)')
     .addStringOption(opt =>
       opt.setName('status')
-        .setDescription('Set permanent 24/7 status for a voice channel (type "clear" to remove)')
+        .setDescription('Set 24/7 status or live dynamic counts (e.g. stats, stats <e1> <e2>, or "clear")')
         .setRequired(false)
     )
     .addChannelOption(opt =>
@@ -72,8 +72,15 @@ module.exports = {
         const res = await voiceStatusService.setPermanentStatus(interaction.guild, targetChannel.id, statusOption, interaction.user.tag, client);
         const embed = new EmbedBuilder()
           .setColor(COLORS.SUCCESS)
-          .setTitle('📌 Permanent VC Status Set')
-          .setDescription(`Successfully set permanent status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n*This status will be automatically preserved 24/7 across leaves, empty rooms, and bot restarts.*`)
+          .setTitle(res.isDynamic ? '📊 Live Dynamic VC Status Set' : '📌 Permanent VC Status Set')
+          .setDescription(
+            res.isDynamic
+              ? `Successfully set live dynamic status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n` +
+                `• **Template:** \`${res.template}\`\n` +
+                `• **Live Counts (No Bots):** 🟢 **${res.counts?.onlineHumans ?? 0}** Online • 👥 **${res.counts?.humanMembers ?? 0}** Human Members\n\n` +
+                `*This status continuously auto-updates as members join, leave, or change status, strictly excluding bots.*`
+              : `Successfully set permanent status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n*This status will be automatically preserved 24/7 across leaves, empty rooms, and bot restarts.*`
+          )
           .setTimestamp();
         return interaction.reply({ embeds: [embed] });
       } catch (err) {
@@ -654,7 +661,9 @@ module.exports = {
       if (!targetChannel || !targetChannel.isVoiceBased()) {
         return message.reply(
           '❌ Please join a voice channel or mention one!\n' +
-          '• **Set Status:** `+vc status [#channel] <status text>` (or `+vcstatus <text>` if in VC)\n' +
+          '• **Live Online & Members Status:** `+vcstatus stats [<online_emoji>] [<members_emoji>]` *(e.g. `+vcstatus stats <:online:123> <:members:456>`)*\n' +
+          '• **Custom Template:** `+vcstatus <:dot:123> {online} Online • <:peeps:456> {members} Members`\n' +
+          '• **Set Custom Status:** `+vc status [#channel] <status text>` (or `+vcstatus <text>`)\n' +
           '• **Remove Status:** `+vc status [#channel] clear`\n' +
           '• **View Statuses:** `+vc status list`'
         );
@@ -668,8 +677,12 @@ module.exports = {
           .setTitle(`📌 Permanent Voice Channel Statuses — ${message.guild.name}`)
           .setDescription(
             list.length > 0
-              ? list.map(s => `• <#${s.channelId}>: **"${s.status}"** *(24/7 Permanent)*`).join('\n')
-              : '*No permanent voice statuses configured yet on this server.*\n\n*Usage: `+vc status [#channel] <text>`*'
+              ? list.map(s => {
+                  const isDyn = s.isDynamic || voiceStatusService.isDynamicTemplate(s.template || s.status);
+                  const display = s.lastAppliedStatus || s.status;
+                  return `• <#${s.channelId}>: **"${display}"** ${isDyn ? '*(🔄 Live Dynamic — No Bots)*' : '*(24/7 Permanent)*'}`;
+                }).join('\n')
+              : '*No permanent voice statuses configured yet on this server.*\n\n*Usage: `+vcstatus stats [<emoji1>] [<emoji2>]` or `+vc status [#channel] <text>`*'
           );
         return message.reply({ embeds: [embed] });
       }
@@ -683,8 +696,15 @@ module.exports = {
         const res = await voiceStatusService.setPermanentStatus(message.guild, targetChannel.id, statusText, message.author.tag, client);
         const embed = new EmbedBuilder()
           .setColor(COLORS.SUCCESS)
-          .setTitle('📌 Permanent VC Status Set')
-          .setDescription(`Successfully set permanent status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n*This status will be automatically preserved 24/7 across leaves, empty rooms, and bot restarts.*`)
+          .setTitle(res.isDynamic ? '📊 Live Dynamic VC Status Set' : '📌 Permanent VC Status Set')
+          .setDescription(
+            res.isDynamic
+              ? `Successfully set live dynamic status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n` +
+                `• **Template:** \`${res.template}\`\n` +
+                `• **Live Counts (No Bots):** 🟢 **${res.counts?.onlineHumans ?? 0}** Online • 👥 **${res.counts?.humanMembers ?? 0}** Human Members\n\n` +
+                `*This status continuously auto-updates as members join, leave, or change status, strictly excluding bots.*`
+              : `Successfully set permanent status for <#${targetChannel.id}> to:\n\n**"${res.status}"**\n\n*This status will be automatically preserved 24/7 across leaves, empty rooms, and bot restarts.*`
+          )
           .setTimestamp();
         return message.reply({ embeds: [embed] });
       } catch (err) {

@@ -62,6 +62,9 @@ const GuildSchema = new mongoose.Schema({
   permanentVoiceStatuses: [{
     channelId: { type: String, required: true },
     status: { type: String, required: true },
+    template: { type: String, default: null },
+    isDynamic: { type: Boolean, default: false },
+    lastAppliedStatus: { type: String, default: null },
     enabled: { type: Boolean, default: true },
     setBy: { type: String, default: null },
     updatedAt: { type: Date, default: Date.now }

@@ -184,7 +184,7 @@ function buildSlashHelpEmbed(prefix) {
       },
       {
         name: '🔊 Voice & Lounges (`/vc`)',
-        value: 'Interactive hub: **24/7 Permanent VC Status**, 1-click Join-to-Create setup, temporary lounge controls (lock, unlock, hide, limit, rename), and voice bounce.'
+        value: 'Interactive hub: **24/7 Permanent VC Status & Live Online/Member Counts**, 1-click Join-to-Create setup, temporary lounge controls (lock, unlock, hide, limit, rename), and voice bounce.'
       }
     )
     .setFooter({ text: `Alphabetical Order • Switch options below or type ${prefix}help` })
@@ -261,7 +261,7 @@ function buildPrefixHelpEmbed(prefix) {
       },
       {
         name: '🔊 Voice & Lounges',
-        value: `\`${prefix}bounce @user [rounds]\` • \`${prefix}massdc [#vc]\` • \`${prefix}massmove <#to> [#from]\` • \`${prefix}massmute [#vc]\` • \`${prefix}vc [lock|unlock|hide|show|limit|rename|panel]\` • \`${prefix}vc setup\` • \`${prefix}vc status [#vc] <text>\` • \`${prefix}vcstatus <text>\` *(24/7 Permanent VC Status)*`
+        value: `\`${prefix}bounce @user [rounds]\` • \`${prefix}massdc [#vc]\` • \`${prefix}massmove <#to> [#from]\` • \`${prefix}massmute [#vc]\` • \`${prefix}vc [lock|unlock|hide|show|limit|rename|panel]\` • \`${prefix}vc setup\` • \`${prefix}vc status [#vc] <text>\` • \`${prefix}vcstatus [text|stats <e1> <e2>]\` *(Live Online & Member Counts VC Status)*`
       }
     )
     .setFooter({ text: `Alphabetical Order • Switch options below or type ${prefix}help` })

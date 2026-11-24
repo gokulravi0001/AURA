@@ -1510,8 +1510,10 @@ function createServerTagTestContext(options = {}) {
 
     const toolsMemberComponents = serverToolsHub.buildHubComponents(false, mockGuildDoc);
     const toolsAdminComponents = serverToolsHub.buildHubComponents(true, mockGuildDoc);
-    assert.ok(toolsAdminComponents[0].components[0].data.options.some(o => o.value === 'act_tools_sync_tag'));
-    assert.ok(!toolsMemberComponents[0].components[0].data.options.some(o => o.value === 'act_tools_sync_tag'), 'Non-admins must not see sync tag action');
+    const adminOpts = toolsAdminComponents[0].components[0].options || toolsAdminComponents[0].components[0].data?.options || [];
+    const memberOpts = toolsMemberComponents[0].components[0].options || toolsMemberComponents[0].components[0].data?.options || [];
+    assert.ok(adminOpts.some(o => (o.data?.value || o.value) === 'act_tools_sync_tag'));
+    assert.ok(!memberOpts.some(o => (o.data?.value || o.value) === 'act_tools_sync_tag'), 'Non-admins must not see sync tag action');
 
     // E. Test Minigames Hub
     const gamesEmbed = await gamesHub.buildHubEmbed(mockGuild, mockGuildDoc, mockUser, false);
@@ -1790,6 +1792,20 @@ function createServerTagTestContext(options = {}) {
     const voiceHub = require('../bot/modules/voiceHub');
     const { ChannelType } = require('discord.js');
 
+    const origGuildFindOne = Guild.findOne;
+    const origGuildCreate = Guild.create;
+    const mockDbDoc = {
+      guildId: 'g_perm_vc_test',
+      permanentVoiceStatuses: [],
+      save: async function() { return this; }
+    };
+    Guild.findOne = () => {
+      const p = Promise.resolve(mockDbDoc);
+      p.lean = async () => mockDbDoc;
+      return p;
+    };
+    Guild.create = async (d) => ({ ...d, save: async function() { return this; } });
+
     const restCalls = [];
     const mockClient = {
       rest: {
@@ -1815,6 +1831,7 @@ function createServerTagTestContext(options = {}) {
     const mockGuild = {
       id: 'g_perm_vc_test',
       name: 'Voice Status Test Guild',
+      voiceStates: { cache: new Map() },
       channels: {
         cache: new Map([[mockChannel.id, mockChannel]]),
         fetch: async (id) => id === mockChannel.id ? mockChannel : null
@@ -1858,8 +1875,12 @@ function createServerTagTestContext(options = {}) {
     assert.ok(embed.data.fields.some(f => f.name.includes('Permanent Voice Channel Statuses')));
 
     const comps = voiceHub.buildHubComponents({ id: 'user_1' }, true, mockGuildDoc, null, null);
-    assert.ok(comps[0].components[0].data.options.some(o => o.value === 'act_vc_perm_status'));
+    const vcHubOpts = comps[0].components[0].options || comps[0].components[0].data?.options || [];
+    assert.ok(vcHubOpts.some(o => (o.data?.value || o.value) === 'act_vc_perm_status'));
     assert.ok(comps[comps.length - 1].components.some(b => b.data.custom_id === 'btn_vchub_perm_status'));
+
+    Guild.findOne = origGuildFindOne;
+    Guild.create = origGuildCreate;
   });
 
   // 37. Interactive Help Command: 2-Option Dual-Directory Embed & Buttons
@@ -1949,6 +1970,168 @@ function createServerTagTestContext(options = {}) {
     // +help (no args)
     await helpCmd.executePrefix(mockMessage, [], mockClient, { prefix: '+' });
     assert.ok(replyPayload.embeds[0].data.title.includes('AURA Command Directory & Guide'));
+  });
+
+  // 38. Dynamic Voice Channel Status: Online & Human Member Counts (No Bots) with Custom Emoji
+  await asyncTest('VoiceStatus: Live Online & Human Member Counts (No Bots) with Custom Emoji & Auto-Updates', async () => {
+    const voiceStatusService = require('../bot/modules/voiceStatusService');
+    const voiceHub = require('../bot/modules/voiceHub');
+    const { ChannelType } = require('discord.js');
+
+    const origGuildFindOne = Guild.findOne;
+    const origGuildCreate = Guild.create;
+    const mockDbDoc = {
+      guildId: 'g_dyn_vc_test',
+      permanentVoiceStatuses: [],
+      save: async function() { return this; }
+    };
+    Guild.findOne = () => {
+      const p = Promise.resolve(mockDbDoc);
+      p.lean = async () => mockDbDoc;
+      return p;
+    };
+    Guild.create = async (d) => ({ ...d, save: async function() { return this; } });
+
+    // 1. Template parsing & custom emoji handling
+    const defaultTemplate = voiceStatusService.parseStatsTemplate('stats');
+    assert.strictEqual(defaultTemplate, '🟢 {online} Online • 👥 {members} Members');
+
+    const customEmojiTemplate = voiceStatusService.parseStatsTemplate('stats <:online_dot:999888777> <:members_glow:111222333>');
+    assert.strictEqual(customEmojiTemplate, '<:online_dot:999888777> {online} Online • <:members_glow:111222333> {members} Members');
+
+    const customTextTemplate = voiceStatusService.parseStatsTemplate('<:fire:123> {online} Humans Active | <:star:456> {members} In Server');
+    assert.strictEqual(customTextTemplate, '<:fire:123> {online} Humans Active | <:star:456> {members} In Server');
+
+    assert.ok(voiceStatusService.isDynamicTemplate(defaultTemplate));
+    assert.ok(voiceStatusService.isDynamicTemplate(customEmojiTemplate));
+    assert.ok(voiceStatusService.isDynamicTemplate(customTextTemplate));
+    assert.strictEqual(voiceStatusService.isDynamicTemplate('Just a Normal VC Status 🎵'), false);
+
+    // 2. Setup mock guild with humans and bots
+    // 8 humans (3 online, 5 offline), 3 bots (all 3 online)
+    const memberMap = new Map();
+    // 3 online humans
+    for (let i = 1; i <= 3; i++) {
+      memberMap.set(`human_${i}`, {
+        id: `human_${i}`,
+        user: { id: `human_${i}`, bot: false },
+        presence: { status: 'online' }
+      });
+    }
+    // 5 offline humans
+    for (let i = 4; i <= 8; i++) {
+      memberMap.set(`human_${i}`, {
+        id: `human_${i}`,
+        user: { id: `human_${i}`, bot: false },
+        presence: { status: 'offline' }
+      });
+    }
+    // 3 online bots
+    for (let i = 1; i <= 3; i++) {
+      memberMap.set(`bot_${i}`, {
+        id: `bot_${i}`,
+        user: { id: `bot_${i}`, bot: true },
+        presence: { status: 'online' }
+      });
+    }
+
+    const mockChannel = {
+      id: 'vc_dynamic_101',
+      name: 'Stats Lounge',
+      type: ChannelType.GuildVoice,
+      permissionsFor: () => ({ has: () => true })
+    };
+
+    const mockGuild = {
+      id: 'g_dyn_vc_test',
+      name: 'Dynamic Status Guild',
+      memberCount: 11,
+      approximateMemberCount: 11,
+      approximatePresenceCount: 6, // 3 humans online + 3 bots online = 6
+      voiceStates: { cache: new Map() },
+      channels: {
+        cache: new Map([[mockChannel.id, mockChannel]]),
+        fetch: async (id) => id === mockChannel.id ? mockChannel : null
+      },
+      members: {
+        cache: memberMap,
+        fetchMe: async () => ({ permissions: { has: () => true } }),
+        fetch: async () => memberMap
+      }
+    };
+
+    const restCalls = [];
+    const mockClient = {
+      user: { id: 'aura_bot_1' },
+      rest: {
+        put: async (route, options) => {
+          restCalls.push({ route, body: options?.body });
+          return { success: true };
+        }
+      },
+      guilds: {
+        cache: new Map([[mockGuild.id, mockGuild]])
+      }
+    };
+
+    // 3. Count verification: humans only, strictly no bots!
+    const counts = await voiceStatusService.getGuildMemberCounts(mockGuild);
+    assert.strictEqual(counts.totalMembers, 11, 'Total members including bots');
+    assert.strictEqual(counts.botCount, 3, 'Bot count detected');
+    assert.strictEqual(counts.humanMembers, 8, 'Human members strictly excludes bots (11 - 3 = 8)');
+    assert.strictEqual(counts.onlineHumans, 3, 'Online count strictly excludes bots (6 - 3 = 3)');
+
+    // 4. Resolve template
+    const resolved = await voiceStatusService.resolveStatusTemplate(mockGuild, '<:dot:999> {online} Online • <:peeps:888> {members} Members');
+    assert.strictEqual(resolved, '<:dot:999> 3 Online • <:peeps:888> 8 Members');
+
+    // 5. Set dynamic status via service
+    const res = await voiceStatusService.setPermanentStatus(
+      mockGuild,
+      'vc_dynamic_101',
+      'stats <:dot:999> <:peeps:888>',
+      'AdminTester',
+      mockClient
+    );
+
+    assert.strictEqual(res.isDynamic, true);
+    assert.strictEqual(res.template, '<:dot:999> {online} Online • <:peeps:888> {members} Members');
+    assert.strictEqual(res.status, '<:dot:999> 3 Online • <:peeps:888> 8 Members');
+    assert.strictEqual(restCalls[restCalls.length - 1].body.status, '<:dot:999> 3 Online • <:peeps:888> 8 Members');
+
+    // 6. Test live dynamic update on count change
+    // A new human joins and comes online: humanMembers becomes 9, onlineHumans becomes 4
+    memberMap.set('human_9', {
+      id: 'human_9',
+      user: { id: 'human_9', bot: false },
+      presence: { status: 'online' }
+    });
+    mockGuild.memberCount = 12;
+    mockGuild.approximatePresenceCount = 7;
+
+    await voiceStatusService.updateDynamicStatuses(mockClient, mockGuild.id);
+    assert.strictEqual(restCalls[restCalls.length - 1].body.status, '<:dot:999> 4 Online • <:peeps:888> 9 Members');
+
+    // 7. Verify VoiceHub Embed representation
+    const mockGuildDoc = {
+      permanentVoiceStatuses: [
+        {
+          channelId: 'vc_dynamic_101',
+          status: '<:dot:999> {online} Online • <:peeps:888> {members} Members',
+          lastAppliedStatus: '<:dot:999> 4 Online • <:peeps:888> 9 Members',
+          isDynamic: true,
+          enabled: true
+        }
+      ]
+    };
+    const embed = await voiceHub.buildHubEmbed(mockGuild, mockGuildDoc, { id: 'u_1' }, true);
+    assert.ok(embed.data.fields.some(f => f.name.includes('Permanent Voice Channel Statuses')));
+    const statusField = embed.data.fields.find(f => f.name.includes('Permanent Voice Channel Statuses'));
+    assert.ok(statusField.value.includes('Live Dynamic — No Bots'));
+    assert.ok(statusField.value.includes('<:dot:999> 4 Online • <:peeps:888> 9 Members'));
+
+    Guild.findOne = origGuildFindOne;
+    Guild.create = origGuildCreate;
   });
 
   guildService.getSettings = originalGetSettings;

@@ -3,6 +3,7 @@ const counterService = require('../../modules/counterService');
 const statsService = require('../../modules/statsService');
 const inviteService = require('../../modules/inviteService');
 const serverTagService = require('../../modules/serverTagService');
+const voiceStatusService = require('../../modules/voiceStatusService');
 
 module.exports = {
   name: 'guildMemberAdd',
@@ -11,6 +12,9 @@ module.exports = {
 
     // Track join in stats
     statsService.recordJoin(member.guild.id);
+
+    // Queue dynamic VC status update if dynamic online/member stats are active
+    voiceStatusService.queueDynamicStatusUpdate(member.guild, client);
 
     // Fetch guild settings
     const settings = await guildService.getSettings(member.guild.id);

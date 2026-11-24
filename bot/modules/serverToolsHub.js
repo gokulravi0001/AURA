@@ -24,8 +24,8 @@ const serverToolsHub = {
     const tagInfo = serverTagService.detectGuildServerTagInfo(guild, tagCfg);
     const tagEnabled = tagCfg.enabled && guildDoc?.modules?.server_tag_role !== false;
     const tagRoleDisplay = tagCfg.roleId ? `<@&${tagCfg.roleId}>` : '`Not configured`';
-    const tagWearerCount = tagCfg.roleId && guild.roles.cache.has(tagCfg.roleId)
-      ? guild.members.cache.filter(m => m.roles.cache.has(tagCfg.roleId)).size
+    const tagWearerCount = tagCfg.roleId && guild.roles?.cache?.has(tagCfg.roleId)
+      ? (typeof guild.members?.cache?.filter === 'function' ? guild.members.cache.filter(m => m.roles?.cache?.has(tagCfg.roleId)).size : (tagCfg.activeMemberCount || 0))
       : (tagCfg.activeMemberCount || 0);
 
     // Voice Counters
