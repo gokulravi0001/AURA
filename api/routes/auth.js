@@ -10,9 +10,9 @@ const DISCORD_API_ENDPOINT = 'https://discord.com/api/v10';
 
 // 1. GET /api/auth/login - Redirect to Discord OAuth2
 router.get('/login', (req, res) => {
-  const clientId = process.env.DISCORD_CLIENT_ID;
+  const clientId = (process.env.DISCORD_CLIENT_ID || '1550194365635362876').trim();
   const redirectUri = encodeURIComponent(
-    process.env.DISCORD_REDIRECT_URI || 'https://aura-discord-bot-yg5a.onrender.com/api/auth/callback'
+    (process.env.DISCORD_REDIRECT_URI || 'https://aura-discord-bot-yg5a.onrender.com/api/auth/callback').trim()
   );
   const scope = encodeURIComponent('identify guilds');
 
@@ -57,13 +57,22 @@ router.get('/callback', async (req, res) => {
     return res.redirect(`${errorTarget}missing_code`);
   }
 
+  const clientId = (process.env.DISCORD_CLIENT_ID || '1550194365635362876').trim();
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET ? process.env.DISCORD_CLIENT_SECRET.trim() : '';
+  const redirectUri = (process.env.DISCORD_REDIRECT_URI || 'https://aura-discord-bot-yg5a.onrender.com/api/auth/callback').trim();
+
+  if (!clientSecret) {
+    logger.error('[Auth] DISCORD_CLIENT_SECRET is missing from environment variables on Render!');
+    return res.redirect(`${errorTarget}auth_failed&reason=Missing_DISCORD_CLIENT_SECRET_on_Render`);
+  }
+
   try {
     const params = new URLSearchParams({
-      client_id: process.env.DISCORD_CLIENT_ID,
-      client_secret: process.env.DISCORD_CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       grant_type: 'authorization_code',
       code: code,
-      redirect_uri: process.env.DISCORD_REDIRECT_URI || 'https://aura-discord-bot-yg5a.onrender.com/api/auth/callback'
+      redirect_uri: redirectUri
     });
 
     // Exchange code for token
@@ -122,12 +131,14 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${dashboardUrl}/servers`);
     });
   } catch (err) {
+    const errorData = err.response?.data;
+    const reason = errorData?.error_description || errorData?.error || err.message;
     logger.error('Discord OAuth2 Callback Error:', {
       status: err.response?.status,
-      data: err.response?.data,
+      data: errorData,
       message: err.message
     });
-    res.redirect(`${errorTarget}auth_failed`);
+    res.redirect(`${errorTarget}auth_failed&reason=${encodeURIComponent(reason)}`);
   }
 });
 
