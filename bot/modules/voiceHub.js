@@ -279,7 +279,7 @@ const voiceHub = {
     const customId = interaction.customId;
     const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
     const isAdmin = isOwnerOrAdmin(member, interaction.guild, client);
-    const voiceState = interaction.guild.voiceStates.cache.get(member.id);
+    const voiceState = interaction.guild?.voiceStates?.cache?.get ? interaction.guild.voiceStates.cache.get(member.id) : null;
     const voiceChannel = voiceState?.channel;
 
     // Refresh button
@@ -474,7 +474,7 @@ const voiceHub = {
     const selected = interaction.values[0];
     const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
     const isAdmin = isOwnerOrAdmin(member, interaction.guild, client);
-    const voiceState = interaction.guild.voiceStates.cache.get(member.id);
+    const voiceState = interaction.guild?.voiceStates?.cache?.get ? interaction.guild.voiceStates.cache.get(member.id) : null;
     const voiceChannel = voiceState?.channel;
 
     if (selected === 'act_vc_refresh') {
@@ -634,7 +634,7 @@ const voiceHub = {
         targetChannelId = channelRaw.replace(/[<#>]/g, '').trim();
       } else {
         const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
-        const voiceState = interaction.guild.voiceStates.cache.get(member.id);
+        const voiceState = interaction.guild?.voiceStates?.cache?.get ? interaction.guild.voiceStates.cache.get(member.id) : null;
         targetChannelId = voiceState?.channelId;
       }
 

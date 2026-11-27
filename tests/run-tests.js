@@ -2172,6 +2172,120 @@ function createServerTagTestContext(options = {}) {
     Guild.create = origGuildCreate;
   });
 
+  await test('Comprehensive Command Maintenance Audit: All Slash & Prefix (+) Commands Operate Cleanly', async () => {
+    const fs = require('fs');
+    const path = require('path');
+    const commandsDir = path.join(__dirname, '../bot/commands');
+    const categories = fs.readdirSync(commandsDir);
+
+    const mockClient = {
+      user: { id: 'bot_aura_1', tag: 'AURA#0001', username: 'AURA', displayAvatarURL: () => 'https://cdn.discordapp.com/embed/avatars/0.png' },
+      commands: new Map(),
+      prefixCommands: new Map(),
+      aliases: new Map(),
+      guilds: {
+        cache: new Map([
+          ['guild_1', {
+            id: 'guild_1',
+            name: 'Audit Guild',
+            channels: { cache: new Map() },
+            members: {
+              cache: new Map(),
+              fetch: async () => null,
+              fetchMe: async () => ({ id: 'bot_aura_1', permissions: { has: () => true }, roles: { highest: { position: 10 } } })
+            },
+            voiceStates: { cache: new Map() }
+          }]
+        ])
+      },
+      users: { cache: new Map(), fetch: async () => null }
+    };
+
+    // Load all commands from disk
+    const commandFiles = [];
+    for (const cat of categories) {
+      const catPath = path.join(commandsDir, cat);
+      if (!fs.statSync(catPath).isDirectory()) continue;
+      for (const file of fs.readdirSync(catPath).filter(f => f.endsWith('.js'))) {
+        const cmd = require(path.join(catPath, file));
+        commandFiles.push({ cat, file, cmd });
+
+        if (cmd.data?.name) {
+          mockClient.commands.set(cmd.data.name, cmd);
+        }
+        const pName = cmd.name || cmd.data?.name;
+        if (pName && cmd.executePrefix) {
+          mockClient.prefixCommands.set(pName.toLowerCase(), cmd);
+          if (Array.isArray(cmd.aliases)) {
+            for (const alias of cmd.aliases) {
+              mockClient.aliases.set(alias.toLowerCase(), pName.toLowerCase());
+            }
+          }
+        }
+      }
+    }
+
+    assert.ok(commandFiles.length >= 30, `Expected at least 30 commands, got ${commandFiles.length}`);
+    assert.ok(mockClient.prefixCommands.size >= 30, `Expected at least 30 prefix commands, got ${mockClient.prefixCommands.size}`);
+
+    // Exercise each command's executePrefix safely
+    for (const { cat, file, cmd } of commandFiles) {
+      assert.strictEqual(typeof cmd.executePrefix, 'function', `${cat}/${file} must have executePrefix`);
+      assert.strictEqual(typeof cmd.execute, 'function', `${cat}/${file} must have execute`);
+
+      const mockMsg = {
+        content: `+${cmd.name || cmd.data?.name || 'test'}`,
+        guild: mockClient.guilds.cache.get('guild_1'),
+        author: { id: 'admin_1', tag: 'Admin#0001', username: 'Admin', displayAvatarURL: () => 'https://cdn.discordapp.com/embed/avatars/0.png' },
+        member: {
+          id: 'admin_1',
+          user: { id: 'admin_1', tag: 'Admin#0001', username: 'Admin' },
+          permissions: { has: () => true },
+          voice: { channel: null },
+          roles: { highest: { position: 5 } }
+        },
+        channel: {
+          id: 'chan_1',
+          name: 'general',
+          send: async () => ({ id: 'msg_1' }),
+          messages: { fetch: async () => new Map() }
+        },
+        mentions: {
+          channels: new Map(),
+          roles: new Map(),
+          users: new Map(),
+          members: new Map()
+        },
+        reply: async () => {}
+      };
+
+      try {
+        await cmd.executePrefix(mockMsg, [], mockClient, { prefix: '+' });
+      } catch (err) {
+        assert.fail(`Command ${cat}/${file} threw unexpected error on executePrefix: ${err.message}`);
+      }
+    }
+
+    // Test help command buttons
+    const helpCmd = require('../bot/commands/general/help');
+    let updatedPayload = null;
+    const mockBtnInteraction = {
+      guildId: 'guild_1',
+      customId: 'btn_help_slash',
+      update: async (data) => { updatedPayload = data; }
+    };
+    await helpCmd.handleButton(mockBtnInteraction, mockClient);
+    assert.ok(updatedPayload?.embeds[0].data.title.includes('Slash Commands'));
+
+    mockBtnInteraction.customId = 'btn_help_prefix';
+    await helpCmd.handleButton(mockBtnInteraction, mockClient);
+    assert.ok(updatedPayload?.embeds[0].data.title.includes('Prefix Commands'));
+
+    mockBtnInteraction.customId = 'btn_help_home';
+    await helpCmd.handleButton(mockBtnInteraction, mockClient);
+    assert.ok(updatedPayload?.embeds[0].data.title.includes('Command Directory & Guide'));
+  });
+
   guildService.getSettings = originalGetSettings;
   guildService.updateSettings = originalUpdateSettings;
 

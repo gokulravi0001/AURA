@@ -53,7 +53,7 @@ module.exports = {
         return interaction.reply({ content: '🚫 Only Administrators or Trusted Members can configure permanent voice channel statuses.', ephemeral: true });
       }
 
-      const voiceState = interaction.guild.voiceStates.cache.get(member.id);
+      const voiceState = interaction.guild?.voiceStates?.cache?.get ? interaction.guild.voiceStates.cache.get(member.id) : null;
       let targetChannel = channelOption || voiceState?.channel;
 
       if (!targetChannel) {
@@ -101,7 +101,7 @@ module.exports = {
       const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id);
       const isAdmin = isOwnerOrAdmin(member, interaction.guild, client);
       const guildDoc = await Guild.findOne({ guildId: interaction.guild.id });
-      const voiceState = interaction.guild.voiceStates.cache.get(member.id);
+      const voiceState = interaction.guild?.voiceStates?.cache?.get ? interaction.guild.voiceStates.cache.get(member.id) : null;
       const voiceChannel = voiceState?.channel;
       const tempDoc = voiceChannel ? await TempVoice.findOne({ channelId: voiceChannel.id }) : null;
       const embed = await voiceHub.buildHubEmbed(interaction.guild, guildDoc, member, isAdmin);
@@ -467,7 +467,7 @@ module.exports = {
         });
       }
 
-      const currentVoice = guild.voiceStates.cache.get(targetMember.id);
+      const currentVoice = guild.voiceStates?.cache?.get ? guild.voiceStates.cache.get(targetMember.id) : null;
       if (!currentVoice?.channelId) {
         return interaction.reply({ content: `❌ <@${targetMember.id}> is not currently connected to any voice channel.`, ephemeral: true });
       }
@@ -633,7 +633,7 @@ module.exports = {
       const member = message.member || await message.guild.members.fetch(message.author.id);
       const isAdmin = isOwnerOrAdmin(member, message.guild, client);
       const guildDoc = await Guild.findOne({ guildId: message.guild.id });
-      const voiceState = message.guild.voiceStates.cache.get(member.id);
+      const voiceState = message.guild?.voiceStates?.cache?.get ? message.guild.voiceStates.cache.get(member.id) : null;
       const voiceChannel = voiceState?.channel;
       const tempDoc = voiceChannel ? await TempVoice.findOne({ channelId: voiceChannel.id }) : null;
       const embed = await voiceHub.buildHubEmbed(message.guild, guildDoc, member, isAdmin);
@@ -803,7 +803,7 @@ module.exports = {
 
       // If invoked as +vc move <#to> [#from], skip the action word 'move'/'massmove'
       const targetArgs = (action === 'move' || action === 'massmove') ? args.slice(1) : args;
-      const mentionedChannels = [...message.mentions.channels.values()].filter(c => c.isVoiceBased());
+      const mentionedChannels = message.mentions?.channels ? [...message.mentions.channels.values()].filter(c => typeof c?.isVoiceBased === 'function' && c.isVoiceBased()) : [];
 
       let targetChannel = null;
       let sourceChannel = null;
@@ -906,7 +906,7 @@ module.exports = {
 
       const isSubAction = (action === 'disconnect' || action === 'massdc' || action === 'dc' || action === 'massdisconnect');
       const targetArgs = isSubAction ? args.slice(1) : args;
-      const mentionedVoiceChannel = [...message.mentions.channels.values()].find(c => c.isVoiceBased());
+      const mentionedVoiceChannel = message.mentions?.channels ? [...message.mentions.channels.values()].find(c => typeof c?.isVoiceBased === 'function' && c.isVoiceBased()) : null;
 
       let targetChannel = mentionedVoiceChannel;
 
@@ -987,7 +987,7 @@ module.exports = {
 
       const isSubAction = (action === 'mute' || action === 'unmute' || action === 'massmute' || action === 'massunmute' || action === 'servermute' || action === 'serverunmute');
       const targetArgs = isSubAction ? args.slice(1) : args;
-      const mentionedVoiceChannel = [...message.mentions.channels.values()].find(c => c.isVoiceBased());
+      const mentionedVoiceChannel = message.mentions?.channels ? [...message.mentions.channels.values()].find(c => typeof c?.isVoiceBased === 'function' && c.isVoiceBased()) : null;
 
       let targetChannel = mentionedVoiceChannel;
 
@@ -1119,7 +1119,7 @@ module.exports = {
         return message.reply(`🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command.`);
       }
 
-      const currentVoice = guild.voiceStates.cache.get(targetMember.id);
+      const currentVoice = guild.voiceStates?.cache?.get ? guild.voiceStates.cache.get(targetMember.id) : null;
       if (!currentVoice?.channelId) {
         return message.reply(`❌ <@${targetMember.id}> is not currently connected to any voice channel.`);
       }

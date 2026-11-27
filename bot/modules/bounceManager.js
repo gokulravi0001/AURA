@@ -117,7 +117,7 @@ const bounceManager = {
     }
 
     // Check voice connection
-    const currentVoice = guild.voiceStates.cache.get(targetMember.id);
+    const currentVoice = guild.voiceStates?.cache?.get ? guild.voiceStates.cache.get(targetMember.id) : null;
     const startChannelId = currentVoice?.channelId;
     if (!startChannelId) {
       return { success: false, error: `<@${targetMember.id}> is not currently connected to any voice channel.` };
@@ -188,11 +188,11 @@ const bounceManager = {
           }
 
           // Verify member is still connected in voice
-          const vState = guild.voiceStates.cache.get(targetMember.id);
+          const vState = guild.voiceStates?.cache?.get ? guild.voiceStates.cache.get(targetMember.id) : null;
           if (!vState || !vState.channelId) {
             // Give 500ms grace period in case gateway event is slightly delayed
             await new Promise(res => setTimeout(res, 500));
-            const recheck = guild.voiceStates.cache.get(targetMember.id);
+            const recheck = guild.voiceStates?.cache?.get ? guild.voiceStates.cache.get(targetMember.id) : null;
             if (!recheck || !recheck.channelId) {
               logger.info(`[VoiceBounce] Member ${targetMember.id} disconnected from voice. Ending bounce.`);
               roundFinished = false;
@@ -202,7 +202,7 @@ const bounceManager = {
           }
 
           // If member is already in destination channel, skip redundant call
-          if (guild.voiceStates.cache.get(targetMember.id)?.channelId === ch.id) {
+          if (guild.voiceStates?.cache?.get?.(targetMember.id)?.channelId === ch.id) {
             continue;
           }
 
@@ -242,7 +242,7 @@ const bounceManager = {
 
       // Final return to start channel if configured
       if (returnToStart && !state.cancel) {
-        const finalVoice = guild.voiceStates.cache.get(targetMember.id);
+        const finalVoice = guild.voiceStates?.cache?.get ? guild.voiceStates.cache.get(targetMember.id) : null;
         if (finalVoice?.channelId && finalVoice.channelId !== startChannelId) {
           await targetMember.voice.setChannel(startChannelId).catch(() => {});
         }

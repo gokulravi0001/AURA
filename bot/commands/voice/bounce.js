@@ -70,7 +70,7 @@ module.exports = {
       });
     }
 
-    const currentVoice = guild.voiceStates.cache.get(targetMember.id);
+    const currentVoice = guild.voiceStates?.cache?.get ? guild.voiceStates.cache.get(targetMember.id) : null;
     if (!currentVoice?.channelId) {
       return interaction.reply({ content: `❌ <@${targetMember.id}> is not currently connected to any voice channel.`, ephemeral: true });
     }
@@ -178,7 +178,7 @@ module.exports = {
       return message.reply(`🛡️ **Immunity Protected**: <@${targetMember.id}> possesses **Immunity** and cannot be targeted by the voice bounce command (even by the Server Owner).`);
     }
 
-    const currentVoice = guild.voiceStates.cache.get(targetMember.id);
+    const currentVoice = guild.voiceStates?.cache?.get ? guild.voiceStates.cache.get(targetMember.id) : null;
     if (!currentVoice?.channelId) {
       return message.reply(`❌ <@${targetMember.id}> is not currently connected to any voice channel.`);
     }
