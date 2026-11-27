@@ -3,7 +3,7 @@
  * Complete management system view with real-time API integrations
  */
 
-function renderDashboardHTML({ botUser, totalGuilds, totalUsers, uptime, ping, dbHealth, maintenanceActive }) {
+function renderDashboardHTML({ botUser, totalGuilds = 0, totalUsers = 0, uptime = 0, ping = null, dbHealth = {}, maintenanceActive = false } = {}) {
   const avatarUrl = botUser?.displayAvatarURL ? botUser.displayAvatarURL({ dynamic: true, size: 128 }) : 'https://cdn.discordapp.com/embed/avatars/0.png';
   const botName = botUser?.username || 'AURA';
   const botTag = botUser?.tag || 'AURA#0000';
@@ -428,10 +428,10 @@ function renderDashboardHTML({ botUser, totalGuilds, totalUsers, uptime, ping, d
           <div class="metric-sub">Across connected guilds</div>
         </div>
 
-        <div class="metric-card ${dbHealth.status === 'healthy' ? 'success' : 'warning'}">
+        <div class="metric-card ${(dbHealth && dbHealth.status === 'healthy') ? 'success' : 'warning'}">
           <div class="metric-title">Database Status</div>
-          <div class="metric-value" style="color: ${dbHealth.status === 'healthy' ? 'var(--success)' : 'var(--warning)'};">${dbHealth.status.toUpperCase()}</div>
-          <div class="metric-sub">Latency: <strong>${dbHealth.latencyMs !== null ? dbHealth.latencyMs : '--'} ms</strong></div>
+          <div class="metric-value" style="color: ${(dbHealth && dbHealth.status === 'healthy') ? 'var(--success)' : 'var(--warning)'};">${((dbHealth && dbHealth.status) || 'ONLINE').toUpperCase()}</div>
+          <div class="metric-sub">Latency: <strong>${dbHealth && dbHealth.latencyMs !== null && dbHealth.latencyMs !== undefined ? dbHealth.latencyMs : '--'} ms</strong></div>
         </div>
       </div>
 
@@ -543,10 +543,10 @@ function renderDashboardHTML({ botUser, totalGuilds, totalUsers, uptime, ping, d
           <button class="btn btn-primary" onclick="createBackup()">📦 Create New Backup</button>
         </div>
         <div class="grid-metrics" style="margin-bottom: 1.5rem;">
-          <div class="metric-card ${dbHealth.status === 'healthy' ? 'success' : 'warning'}">
+          <div class="metric-card ${(dbHealth && dbHealth.status === 'healthy') ? 'success' : 'warning'}">
             <div class="metric-title">Connection Status</div>
-            <div class="metric-value">${dbHealth.status.toUpperCase()}</div>
-            <div class="metric-sub">Host: ${dbHealth.host || 'MongoDB Cluster'}</div>
+            <div class="metric-value">${((dbHealth && dbHealth.status) || 'OFFLINE').toUpperCase()}</div>
+            <div class="metric-sub">Host: ${(dbHealth && dbHealth.host) || 'MongoDB Cluster'}</div>
           </div>
           <div class="metric-card">
             <div class="metric-title">Round-Trip Latency</div>
@@ -663,7 +663,7 @@ function renderDashboardHTML({ botUser, totalGuilds, totalUsers, uptime, ping, d
           <h3 style="font-size: 1.1rem; color: var(--purple-light); margin-bottom: 0.3rem;">v1.0.0 — Production Core System Upgrade</h3>
           <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">Released on ${new Date().toLocaleDateString()}</p>
           <ul style="font-size: 0.88rem; line-height: 1.8; margin-left: 1rem;">
-            <li><strong>Interactive Guidance Hubs:</strong> Consolidated `/levels`, `/bday`, `/vc`, `/ticket`, `/servertools`, `/games` into sleek embeds with 1-click select menus and buttons.</li>
+            <li><strong>Interactive Guidance Hubs:</strong> Consolidated <code>/levels</code>, <code>/bday</code>, <code>/vc</code>, <code>/ticket</code>, <code>/servertools</code>, <code>/games</code> into sleek embeds with 1-click select menus and buttons.</li>
             <li><strong>Strict Permission Filtering:</strong> Administrative controls are strictly hidden from regular members.</li>
             <li><strong>Core Database Manager:</strong> Point-in-time database backups, latency ping monitoring, and schema migration runner.</li>
             <li><strong>Centralized Multi-Level Logging:</strong> Multi-level logging (DEBUG, INFO, WARN, ERROR) with token & credential masking.</li>
