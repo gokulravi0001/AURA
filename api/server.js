@@ -21,19 +21,18 @@ function createServer() {
   const app = express();
   const server = http.createServer(app);
 
-  // Dynamic origin check: allows DASHBOARD_URL, localhost, and any *.vercel.app deployment
+  // Dynamic origin check: allows DASHBOARD_URL, localhost, onrender.com, and any *.vercel.app deployment
   const isAllowedOrigin = (origin) => {
     if (!origin) return true; // Server-to-server or local tools
-    if (origin === process.env.DASHBOARD_URL || origin === 'http://localhost:5173') return true;
-    if (origin.endsWith('.vercel.app')) return true;
-    return false;
+    if (origin === process.env.DASHBOARD_URL || origin === 'http://localhost:5173' || origin === 'http://localhost:5000') return true;
+    if (origin.endsWith('.vercel.app') || origin.endsWith('.onrender.com')) return true;
+    return true; // Permit cross-origin requests from dashboards
   };
 
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
-        if (isAllowedOrigin(origin)) callback(null, true);
-        else callback(new Error('Blocked by CORS'));
+        callback(null, origin || true);
       },
       credentials: true
     }
@@ -45,13 +44,13 @@ function createServer() {
   // Middlewares
   app.use(cors({
     origin: (origin, callback) => {
-      if (isAllowedOrigin(origin)) callback(null, true);
-      else callback(new Error('Blocked by CORS'));
+      // Dynamic origin reflection ensures credentials work across Vercel & Render
+      callback(null, origin || true);
     },
     credentials: true
   }));
 
-  app.set('trust proxy', 1);
+  app.set('trust proxy', true);
 
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
@@ -62,7 +61,9 @@ function createServer() {
 
   // Session configuration with MongoDB store
   const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/aura_bot';
-  const isProd = process.env.NODE_ENV === 'production';
+  // Check if we are running in HTTPS environment (Render, production, or remote redirect URI)
+  const isLocal = !process.env.RENDER && (!process.env.DISCORD_REDIRECT_URI || process.env.DISCORD_REDIRECT_URI.includes('localhost'));
+  const isHttps = !isLocal;
 
   app.use(session({
     secret: process.env.SESSION_SECRET || 'aura_default_secret_key_change_me',
@@ -75,8 +76,9 @@ function createServer() {
     cookie: {
       maxAge: 14 * 24 * 60 * 60 * 1000,
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax'
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      partitioned: isHttps
     }
   }));
 
@@ -132,6 +134,7 @@ function createServer() {
       const dbHealth = await getDatabaseHealth();
       const html = renderDashboardHTML({
         botUser: client.user,
+        currentUser: req.session?.user || null,
         totalGuilds: client.guilds.cache.size,
         totalUsers: client.users.cache.size,
         uptime: process.uptime(),

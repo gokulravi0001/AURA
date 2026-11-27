@@ -16,7 +16,21 @@ router.get('/login', (req, res) => {
   );
   const scope = encodeURIComponent('identify guilds');
 
-  const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&prompt=consent`;
+  // Detect origin so user returns to the exact dashboard they logged in from
+  const referer = req.headers.referer || '';
+  let returnTo = req.query.returnTo || '';
+  if (!returnTo) {
+    if (referer.includes('vercel.app')) {
+      returnTo = 'vercel';
+    } else if (referer.includes('onrender.com') || referer.includes('localhost')) {
+      returnTo = 'render';
+    }
+  }
+
+  const stateObj = { returnTo };
+  const state = encodeURIComponent(Buffer.from(JSON.stringify(stateObj)).toString('base64url'));
+
+  const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${state}&prompt=consent`;
   res.redirect(authUrl);
 });
 
@@ -27,8 +41,20 @@ router.get('/callback', async (req, res) => {
     ? process.env.DASHBOARD_URL
     : 'https://dashboard-alpha-lovat.vercel.app';
 
+  // Decode state to know where to return user
+  let returnTo = '';
+  if (req.query.state) {
+    try {
+      const decoded = JSON.parse(Buffer.from(decodeURIComponent(req.query.state), 'base64url').toString('utf8'));
+      returnTo = decoded.returnTo || '';
+    } catch {}
+  }
+
+  // Determine fallback target if error
+  const errorTarget = returnTo === 'render' ? '/?error=' : `${dashboardUrl}?error=`;
+
   if (!code) {
-    return res.redirect(`${dashboardUrl}?error=missing_code`);
+    return res.redirect(`${errorTarget}missing_code`);
   }
 
   try {
@@ -57,6 +83,15 @@ router.get('/callback', async (req, res) => {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
 
+    // Filter guild data to only essential fields to keep session lightweight and fast
+    const userGuilds = Array.isArray(guildsResponse.data) ? guildsResponse.data.map(g => ({
+      id: g.id,
+      name: g.name,
+      icon: g.icon,
+      permissions: g.permissions,
+      owner: g.owner
+    })) : [];
+
     // Save in session
     req.session.user = {
       id: userResponse.data.id,
@@ -68,18 +103,31 @@ router.get('/callback', async (req, res) => {
         : `https://cdn.discordapp.com/embed/avatars/0.png`
     };
 
-    req.session.guilds = guildsResponse.data;
+    req.session.guilds = userGuilds;
+
+    logger.info(`[Auth] User ${userResponse.data.username} (${userResponse.data.id}) logged in successfully.`);
 
     req.session.save((err) => {
       if (err) {
         logger.error('Session save error:', err);
-        return res.redirect(`${dashboardUrl}?error=session_error`);
+        return res.redirect(`${errorTarget}session_error`);
       }
+
+      // If user logged in from the Render dashboard, keep them on the Render dashboard!
+      if (returnTo === 'render') {
+        return res.redirect('/dashboard');
+      }
+
+      // Otherwise return to Vercel servers view
       return res.redirect(`${dashboardUrl}/servers`);
     });
   } catch (err) {
-    logger.error('Discord OAuth2 Callback Error:', err.response?.data || err.message);
-    res.redirect(`${dashboardUrl}?error=auth_failed`);
+    logger.error('Discord OAuth2 Callback Error:', {
+      status: err.response?.status,
+      data: err.response?.data,
+      message: err.message
+    });
+    res.redirect(`${errorTarget}auth_failed`);
   }
 });
 
@@ -91,10 +139,17 @@ router.get('/user', (req, res) => {
   res.json({ user: req.session.user, isGuest: false });
 });
 
-// 4. POST /api/auth/logout - Logout
-router.post('/logout', (req, res) => {
+// 4. GET or POST /api/auth/logout - Logout
+router.all('/logout', (req, res) => {
+  const referer = req.headers.referer || '';
   req.session.destroy(() => {
-    res.json({ success: true });
+    if (req.method === 'POST') {
+      return res.json({ success: true });
+    }
+    if (referer.includes('vercel.app')) {
+      return res.redirect(process.env.DASHBOARD_URL || 'https://dashboard-alpha-lovat.vercel.app');
+    }
+    return res.redirect('/');
   });
 });
 
