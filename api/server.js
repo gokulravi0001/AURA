@@ -21,11 +21,11 @@ function createServer() {
   const app = express();
   const server = http.createServer(app);
 
-  // Dynamic origin check: allows DASHBOARD_URL, localhost, onrender.com, and any *.vercel.app deployment
+  // Dynamic origin check: allows DASHBOARD_URL, localhost, onrender.com, and any *.netlify.app deployment
   const isAllowedOrigin = (origin) => {
     if (!origin) return true; // Server-to-server or local tools
     if (origin === process.env.DASHBOARD_URL || origin === 'http://localhost:5173' || origin === 'http://localhost:5000') return true;
-    if (origin.endsWith('.vercel.app') || origin.endsWith('.onrender.com')) return true;
+    if (origin.endsWith('.netlify.app') || origin.endsWith('.onrender.com') || origin.endsWith('.vercel.app')) return true;
     return true; // Permit cross-origin requests from dashboards
   };
 
@@ -117,35 +117,22 @@ function createServer() {
     });
   });
 
-  // Root endpoint serving the Core Management Dashboard interface
+  // Root endpoint serving API backend status (Web dashboard is hosted on Netlify)
   app.get(['/', '/dashboard'], async (req, res) => {
-    // If request explicitly asks for JSON, respond with JSON health check
-    if (req.headers.accept && req.headers.accept.includes('application/json') && !req.headers.accept.includes('text/html')) {
-      return res.json({
+    try {
+      const dbHealth = await getDatabaseHealth();
+      res.json({
         status: 'online',
+        service: 'AURA Discord Bot API Backend',
         bot: client.user ? client.user.tag : 'AURA',
         uptime: process.uptime(),
         ping: client.ws?.ping ?? null,
+        dbStatus: dbHealth.status,
+        dashboard: process.env.DASHBOARD_URL || 'Hosted on Netlify',
         timestamp: new Date().toISOString()
       });
-    }
-
-    try {
-      const dbHealth = await getDatabaseHealth();
-      const html = renderDashboardHTML({
-        botUser: client.user,
-        currentUser: req.session?.user || null,
-        totalGuilds: client.guilds.cache.size,
-        totalUsers: client.users.cache.size,
-        uptime: process.uptime(),
-        ping: client.ws?.ping ?? null,
-        dbHealth,
-        maintenanceActive: maintenanceService.isMaintenanceActive()
-      });
-      res.setHeader('Content-Type', 'text/html');
-      res.send(html);
     } catch (err) {
-      res.status(500).send('Error rendering dashboard: ' + err.message);
+      res.status(500).json({ error: 'Internal Server Error', message: err.message });
     }
   });
 

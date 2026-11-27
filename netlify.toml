@@ -1,0 +1,20 @@
+[build]
+  base = "dashboard"
+  publish = "dashboard/dist"
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Proxy API requests directly to the Render bot backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://aura-discord-bot-yg5a.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# SPA client-side routing fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

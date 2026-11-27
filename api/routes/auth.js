@@ -19,10 +19,12 @@ router.get('/login', (req, res) => {
   // Detect origin so user returns to the exact dashboard they logged in from
   const referer = req.headers.referer || '';
   let returnTo = req.query.returnTo || '';
-  if (!returnTo) {
-    if (referer.includes('vercel.app')) {
-      returnTo = 'vercel';
-    } else if (referer.includes('onrender.com') || referer.includes('localhost')) {
+  if (!returnTo && referer) {
+    if (referer.includes('localhost') || referer.includes('127.0.0.1')) {
+      returnTo = referer.split('/').slice(0, 3).join('/');
+    } else if (referer.includes('netlify.app') || referer.includes('vercel.app')) {
+      returnTo = referer.split('/').slice(0, 3).join('/');
+    } else if (referer.includes('onrender.com')) {
       returnTo = 'render';
     }
   }
@@ -37,9 +39,9 @@ router.get('/login', (req, res) => {
 // 2. GET /api/auth/callback - OAuth2 Callback Code Exchange
 router.get('/callback', async (req, res) => {
   const code = req.query.code;
-  const dashboardUrl = (process.env.DASHBOARD_URL && !process.env.DASHBOARD_URL.includes('aura-bot-dashboard'))
+  const dashboardUrl = (process.env.DASHBOARD_URL && !process.env.DASHBOARD_URL.includes('vercel.app'))
     ? process.env.DASHBOARD_URL
-    : 'https://dashboard-alpha-lovat.vercel.app';
+    : 'https://aura-bot.netlify.app';
 
   // Decode state to know where to return user
   let returnTo = '';
@@ -50,8 +52,12 @@ router.get('/callback', async (req, res) => {
     } catch {}
   }
 
-  // Determine fallback target if error
-  const errorTarget = returnTo === 'render' ? '/?error=' : `${dashboardUrl}?error=`;
+  // Determine target origin
+  const baseTarget = (returnTo && (returnTo.startsWith('http://') || returnTo.startsWith('https://')))
+    ? returnTo
+    : dashboardUrl;
+
+  const errorTarget = returnTo === 'render' ? '/?error=' : `${baseTarget}?error=`;
 
   if (!code) {
     return res.redirect(`${errorTarget}missing_code`);
@@ -122,12 +128,15 @@ router.get('/callback', async (req, res) => {
         return res.redirect(`${errorTarget}session_error`);
       }
 
-      // If user logged in from the Render dashboard, keep them on the Render dashboard!
-      if (returnTo === 'render') {
-        return res.redirect('/dashboard');
+      // If user came from Netlify or custom dashboard, return them there
+      if (returnTo && (returnTo.startsWith('http://') || returnTo.startsWith('https://'))) {
+        return res.redirect(`${returnTo}/servers`);
       }
 
-      // Otherwise return to Vercel servers view
+      if (returnTo === 'render') {
+        return res.redirect('/');
+      }
+
       return res.redirect(`${dashboardUrl}/servers`);
     });
   } catch (err) {
@@ -157,10 +166,11 @@ router.all('/logout', (req, res) => {
     if (req.method === 'POST') {
       return res.json({ success: true });
     }
-    if (referer.includes('vercel.app')) {
-      return res.redirect(process.env.DASHBOARD_URL || 'https://dashboard-alpha-lovat.vercel.app');
+    if (referer) {
+      const origin = referer.split('/').slice(0, 3).join('/');
+      return res.redirect(origin);
     }
-    return res.redirect('/');
+    return res.redirect(process.env.DASHBOARD_URL || '/');
   });
 });
 
